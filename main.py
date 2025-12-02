@@ -30,7 +30,7 @@ storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 scheduler = AsyncIOScheduler()
 
-WEBHOOK_PATH = f"/webhook/{config.TELEGRAM_BOT_TOKEN}"
+WEBHOOK_PATH = f"/webhook"
 WEBHOOK_URL = f"{config.WEBHOOK_BASE_URL}{WEBHOOK_PATH}"
 
 def register_handlers():
