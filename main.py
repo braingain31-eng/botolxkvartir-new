@@ -1,8 +1,6 @@
 import os
 import asyncio
 import logging
-import signal
-from datetime import datetime
 from flask import Flask, request, jsonify
 
 from aiogram import Bot, Dispatcher, types
@@ -13,8 +11,12 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 import config
 from database.firebase_db import init_firebase
-from handlers import start, search, property, agent, payment, reminders, errors, payment_menu
-from utils.olx_parser import parse_olx_listing
+from utils.scheduler import start_scheduler  # ← ТВОЙ ПЛАНИРОВЩИК
+
+# Импортируем роутеры
+from handlers import start, search, payment, agent, errors, payment_menu
+from handlers.property import router as property_router
+from handlers.reminders import router as reminders_router  # если есть
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,83 +27,68 @@ bot = Bot(
     token=config.TELEGRAM_BOT_TOKEN,
     default=DefaultBotProperties(parse_mode=ParseMode.HTML)
 )
-
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
-scheduler = AsyncIOScheduler()
 
-WEBHOOK_PATH = f"/webhook"
+WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{config.WEBHOOK_BASE_URL}{WEBHOOK_PATH}"
 
+# Регистрация роутеров
+dp.include_router(start.router)
+dp.include_router(search.router)
+dp.include_router(payment.router)
+dp.include_router(agent.router)
+dp.include_router(errors.router)
+dp.include_router(payment_menu.router)
+dp.include_router(property_router)
+dp.include_router(reminders_router)  # если есть
 
-
-def register_handlers():
-    start.register_handlers(dp)
-    search.register_handlers(dp)
-    property.register_handlers(dp)
-    agent.register_handlers(dp)
-    payment.register_handlers(dp)
-    payment_menu.register_handlers_payment_menu(dp)
-    reminders.register_handlers(dp)
-    errors.register_handlers(dp)
-    logger.info("Все хендлеры зарегистрированы")
-
+# --- ПАРСЕР OLX ---
 async def run_olx_parser():
     try:
-        logger.info("Парсинг OLX запущен...")
+        logger.info("Запуск планового парсинга OLX...")
         added = await parse_olx_listing()
-        logger.info(f"Добавлено объявлений: {added}")
+        logger.info(f"Парсинг завершён. Добавлено: {added} новых объявлений")
     except Exception as e:
-        logger.error(f"Ошибка парсинга: {e}", exc_info=True)
+        logger.error(f"Ошибка парсинга OLX: {e}", exc_info=True)
 
+# --- СТАРТАП ---
 async def startup():
-    register_handlers()
     init_firebase()
-    logger.info("Firebase подключён")
+    logger.info("Firebase инициализирован")
+
+    await start_scheduler()  # ← ВОТ ОНО! ПЛАНИРОВЩИК ЗАПУЩЕН!
+    logger.info("Планировщик OLX запущен — парсит каждые 6 часов")
+
     await bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True)
     logger.info(f"Вебхук установлен: {WEBHOOK_URL}")
-    scheduler.add_job(run_olx_parser, "interval", hours=6, next_run_time=datetime.now())
-    scheduler.start()
-    logger.info("Планировщик запущен")
 
+# --- ШАТДАУН ---
 async def shutdown():
     logger.info("Остановка бота...")
-    if scheduler.running:
-        scheduler.shutdown()
     await bot.delete_webhook(drop_pending_updates=True)
     await bot.session.close()
 
-def handle_sigterm(*_):
-    asyncio.run(shutdown())
+# --- ГАРАНТИРОВАННЫЙ ЗАПУСК ПРИ СТАРТЕ КОНТЕЙНЕРА ---
+asyncio.get_event_loop().run_until_complete(startup())
 
-signal.signal(signal.SIGTERM, handle_sigterm)
-
-# ГЛАВНОЕ ИСПРАВЛЕНИЕ — НОВЫЙ EVENT LOOP В КАЖДОМ ПО  ТОКЕ
+# --- ВЕБХУК ---
 @app.route(WEBHOOK_PATH, methods=["POST"])
 def webhook():
     try:
-        update_json = request.get_json(force=True)
-        update = types.Update.model_validate(update_json, context={"bot": bot})
-        
-        # СОЗДАЁМ НОВЫЙ EVENT LOOP ДЛЯ ЭТОГО ПОТОКА
+        update = types.Update.model_validate(request.get_json(force=True), context={"bot": bot})
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(dp.feed_update(bot, update))
         loop.close()
-        
         return jsonify({"status": "ok"}), 200
     except Exception as e:
-        logger.error(f"Ошибка в вебхуке: {e}", exc_info=True)
+        logger.error(f"Ошибка вебхука: {e}", exc_info=True)
         return jsonify({"error": "bad request"}), 400
 
-asyncio.get_event_loop().run_until_complete(startup())
-
+# --- HEALTH ---
 @app.route("/")
 def health():
-    return "GoaNest Bot ЖИВЁТ НАВСЕГДА — Cloud Run — Декабрь 2025", 200
+    return "GoaNest Bot ЖИВЁТ НАВСЕГДА — парсит OLX каждые 6 часов — декабрь 2025", 200
 
-# Запуск стартапа
-# if __name__ == "__main__":
-#     asyncio.run(startup())
-#     port = int(os.environ.get("PORT", 8080))
-#     app.run(host="0.0.0.0", port=port)
+# НИКАКОГО if __name__ == "__main__" — Cloud Run использует gunicorn
