@@ -4,40 +4,38 @@ import os
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 import config
 from database.firebase_db import init_firebase
 from utils.scheduler import start_scheduler
 
-# Импортируем роутеры (убедись, что они у тебя на aiogram 3.x с роутерами)
+# Подключаем роутеры
 from handlers import start, search, payment, agent, errors, payment_menu
 from handlers.property import router as property_router
-# если reminders и другие — тоже подключи
 
-# --- Логи ---
+# Логи
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- Бот и диспетчер ---
+# Бот с правильным DefaultBotProperties (aiogram 3.7+)
 bot = Bot(
     token=config.TELEGRAM_BOT_TOKEN,
     default=DefaultBotProperties(parse_mode=ParseMode.HTML)
 )
 dp = Dispatcher()
 
-# --- Планировщик ---
-scheduler = AsyncIOScheduler()
-
 async def main():
-    # Инициализация Firebase
+    logger.info("Запуск бота в режиме polling...")
+
+    # Firebase
     init_firebase()
-    .info("Firebase инициализирован")
+    logger.info("Firebase подключён")
 
-    # Запуск твоего кастомного планировщика (если есть)
+    # Твой планировщик
     await start_scheduler()
+    logger.info("Планировщик запущен")
 
-    # Регистрация всех роутеров
+    # Роутеры
     dp.include_router(start.router)
     dp.include_router(search.router)
     dp.include_router(payment.router)
@@ -45,19 +43,18 @@ async def main():
     dp.include_router(errors.router)
     dp.include_router(payment_menu.router)
     dp.include_router(property_router)
-    # добавь остальные, если есть
 
-    .info("Все роутеры подключены")
+    logger.info("Все роутеры подключены")
 
-    # УДАЛЯЕМ ВЕБХУК ПРИ СТАРТЕ (на всякий случай)
+    # Удаляем старый вебхук (чтобы не мешал)
     await bot.delete_webhook(drop_pending_updates=True)
-    .info("Старый вебхук удалён")
+    logger.info("Старый вебхук удалён")
 
-    .info("Бот запущен в режиме polling — работает 24/7 на Render!")
+    logger.info("Бот запущен в polling-режиме — работает 24/7 на Render!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
-        .info("Бот остановлен")
+        logger.info("Бот остановлен")
