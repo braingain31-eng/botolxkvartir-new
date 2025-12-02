@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 # Инициализация Firebase
 def init_firebase():
     if not firebase_admin._apps:
-        cred = credentials.Certificate(config.FIREBASE_CREDENTIALS_PATH)
+        cred = credentials.Certificate("firebase-service-account.json")
         firebase_admin.initialize_app(cred)
     return firestore.client()
 
