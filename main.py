@@ -84,7 +84,7 @@ def handle_sigterm(*_):
 
 signal.signal(signal.SIGTERM, handle_sigterm)
 
-# --- Вебхук-роут ---
+# --- Вебхук-роу т ---
 @app.route(WEBHOOK_PATH, methods=["POST"])
 async def webhook():
     update = types.Update.model_validate(request.get_json(force=True), context={"bot": bot})
