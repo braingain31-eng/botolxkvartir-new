@@ -8,13 +8,16 @@ ENV PYTHONUNBUFFERED True
 # Copy local code to the container image.
 ENV APP_HOME /app
 WORKDIR $APP_HOME
-COPY . .
-
-# Install production dependencies.
-# We use a virtualenv to isolate dependencies.
-# RUN python3 -m venv /venv
-# ENV PATH="/venv/bin:$PATH"
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Предзагружаем модель Whisper (важно ДО копирования кода!)
+RUN python -c "from faster_whisper import WhisperModel; \
+    print('Скачиваем модель base...'); \
+    WhisperModel('base', device='cpu', compute_type='int8')"
+
+# Копируем код
+COPY . .
 
 # Run the web server on container startup.
 # Use gunicorn for production.
