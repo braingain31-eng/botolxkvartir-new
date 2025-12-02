@@ -8,6 +8,8 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 
 import config
 from handlers import start, search, property, agent, payment, reminders, errors, payment_menu
@@ -19,7 +21,11 @@ logger = logging.getLogger(__name__)
 
 # --- Flask + Aiogram ---
 app = Flask(__name__)
-bot = Bot(token=config.TELEGRAM_BOT_TOKEN, parse_mode=ParseMode.HTML)
+# bot = Bot(token=config.TELEGRAM_BOT_TOKEN, parse_mode=ParseMode.HTML)
+bot = Bot(
+    token=config.TELEGRAM_BOT_TOKEN,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 scheduler = AsyncIOScheduler()
