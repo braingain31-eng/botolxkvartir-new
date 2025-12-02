@@ -1,5 +1,6 @@
 import os
 import asyncio
+import threading
 import logging
 import signal
 from datetime import datetime
@@ -32,6 +33,11 @@ scheduler = AsyncIOScheduler()
 
 WEBHOOK_PATH = f"/webhook"
 WEBHOOK_URL = f"{config.WEBHOOK_BASE_URL}{WEBHOOK_PATH}"
+
+def init_bot():
+    asyncio.run(startup())  # ← хендлеры + вебхук + планировщик
+
+threading.Thread(target=init_bot, daemon=True).start()
 
 def register_handlers():
     start.register_handlers(dp)
@@ -97,7 +103,7 @@ def health():
     return "GoaNest Bot ЖИВЁТ НАВСЕГДА — Cloud Run — Декабрь 2025", 200
 
 # Запуск стартапа
-if __name__ == "__main__":
-    asyncio.run(startup())
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+# if __name__ == "__main__":
+#     asyncio.run(startup())
+#     port = int(os.environ.get("PORT", 8080))
+#     app.run(host="0.0.0.0", port=port)
