@@ -1,4 +1,3 @@
-# main_bot.py
 import asyncio
 import logging
 import signal

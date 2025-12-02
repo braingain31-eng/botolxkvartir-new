@@ -10,8 +10,8 @@
       {
         "source": "**",
         "run": {
-          "serviceId": "botolxkvartir",
-          "region": "us-east4"
+        "serviceId": "botolxkvartir-new",
+        "region": "europe-west1"
         }
       }
     ]
