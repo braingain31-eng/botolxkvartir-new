@@ -1,4 +1,4 @@
-# database/firebase_db.py — ПОЛНОСТЬЮ РАБОЧАЯ ВЕРСИЯ С СОРТИРОВКОЙ (Ноябрь 2025)
+# database/firebase_db.py — ПОЛНОСТЬЮ РАБОЧАЯ ВЕРСИЯ С СОРТИРОВКОЙ (Нояб  рь 2025)
 
 import firebase_admin
 from firebase_admin import credentials, firestore
