@@ -74,7 +74,7 @@ def handle_sigterm(*_):
 
 signal.signal(signal.SIGTERM, handle_sigterm)
 
-# ГЛАВНОЕ ИСПРАВЛЕНИЕ — НОВЫЙ EVENT LOOP В КАЖДОМ ПОТОКЕ
+# ГЛАВНОЕ ИСПРАВЛЕНИЕ — НОВЫЙ EVENT LOOP В КАЖДОМ ПО  ТОКЕ
 @app.route(WEBHOOK_PATH, methods=["POST"])
 def webhook():
     try:
