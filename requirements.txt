@@ -1,0 +1,17 @@
+# Force re-install to fix dependency caching issues in Cloud Build
+aiogram==3.13.1
+beautifulsoup4==4.12.3
+firebase-admin==6.5.0
+requests==2.32.3
+python-dotenv==1.0.1
+apscheduler==3.10.4
+gunicorn==22.0.0
+uvicorn==0.29.0
+faster-whisper
+loguru
+aiosqlite
+openai==1.51.2
+httpx==0.27.0
+fake-useragent
+Flask==3.0.3
+lxml==5.2.2
