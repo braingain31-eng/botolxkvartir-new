@@ -1,6 +1,5 @@
 import os
 import asyncio
-import threading
 import logging
 import signal
 from datetime import datetime
@@ -34,10 +33,7 @@ scheduler = AsyncIOScheduler()
 WEBHOOK_PATH = f"/webhook"
 WEBHOOK_URL = f"{config.WEBHOOK_BASE_URL}{WEBHOOK_PATH}"
 
-def init_bot():
-    asyncio.run(startup())  # ← хендлеры + вебхук + планировщик
 
-threading.Thread(target=init_bot, daemon=True).start()
 
 def register_handlers():
     start.register_handlers(dp)
@@ -97,6 +93,8 @@ def webhook():
     except Exception as e:
         logger.error(f"Ошибка в вебхуке: {e}", exc_info=True)
         return jsonify({"error": "bad request"}), 400
+
+asyncio.get_event_loop().run_until_complete(startup())
 
 @app.route("/")
 def health():
