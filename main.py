@@ -20,10 +20,9 @@ from utils.olx_parser import parse_olx_listing
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- Flask + Aiogram ---
 app = Flask(__name__)
 
-# Правильный бот для aiogram 3.7+
+# Правильный бот
 bot = Bot(
     token=config.TELEGRAM_BOT_TOKEN,
     default=DefaultBotProperties(parse_mode=ParseMode.HTML)
@@ -37,7 +36,7 @@ scheduler = AsyncIOScheduler()
 WEBHOOK_PATH = f"/webhook/{config.TELEGRAM_BOT_TOKEN}"
 WEBHOOK_URL = f"{config.WEBHOOK_BASE_URL}{WEBHOOK_PATH}"
 
-# --- Регистрация хендлеров ---
+# --- Регистрация ---
 def register_handlers():
     start.register_handlers(dp)
     search.register_handlers(dp)
@@ -49,35 +48,25 @@ def register_handlers():
     errors.register_handlers(dp)
     logger.info("Все хендлеры зарегистрированы")
 
-# --- Парсер OLX ---
+# --- OLX парсер ---
 async def run_olx_parser():
     try:
-        logger.info("Запуск планового парсинга OLX...")
-        added = await parse_olx_parser()
-        logger.info(f"Парсинг завершён. Добавлено: {added}")
+        logger.info("Запуск парсинга OLX...")
+        added = await parse_olx_listing()
+        logger.info(f"Добавлено объявлений: {added}")
     except Exception as e:
-        logger.error(f"Ошибка парсинга OLX: {e}", exc_info=True)
+        logger.error(f"Ошибка парсинга: {e}", exc_info=True)
 
 # --- Старт ---
-# @app.before_first_request
-# def before_first_request():
-#     asyncio.ensure_future(startup())
-
-def init_app():
-    """Инициализация при старте — вместо устаревшего @before_first_request"""
-    asyncio.ensure_future(startup())
-
 async def startup():
     register_handlers()
     init_firebase()
-    logger.info("Firebase инициализирован")
-
+    logger.info("Firebase подключён")
     await bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True)
     logger.info(f"Вебхук установлен: {WEBHOOK_URL}")
-
     scheduler.add_job(run_olx_parser, "interval", hours=6, next_run_time=datetime.now())
     scheduler.start()
-    logger.info("Планировщик запущен — OLX парсится каждые 6 часов")
+    logger.info("Планировщик запущен — OLX каждые 6 часов")
 
 # --- Graceful shutdown ---
 async def shutdown():
@@ -86,31 +75,34 @@ async def shutdown():
         scheduler.shutdown()
     await bot.delete_webhook(drop_pending_updates=True)
     await bot.session.close()
-    logger.info("Бот остановлен")
 
 def handle_sigterm(*_):
-    logger.warning("SIGTERM получен — graceful shutdown")
-    asyncio.ensure_future(shutdown())
+    asyncio.run(shutdown())
 
 signal.signal(signal.SIGTERM, handle_sigterm)
 
-# --- Вебхук ---
+# --- Вебхук (ГЛАВНОЕ ИСПРАВЛЕНИЕ!) ---
 @app.route(WEBHOOK_PATH, methods=["POST"])
 def webhook():
-    if request.headers.get("content-type") != "application/json":
-        return jsonify({"status": "bad request"}), 400
+    try:
+        update = types.Update.model_validate(request.get_json(force=True), context={"bot": bot})
+        # ← САМОЕ ВАЖНОЕ: запускаем в новом event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(dp.feed_update(bot, update))
+        loop.close()
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        logger.error(f"Ошибка обработки обновления: {e}", exc_info=True)
+        return jsonify({"error": "bad request"}), 400
 
-    update = types.Update.model_validate(request.get_json(force=True), context={"bot": bot})
-    asyncio.ensure_future(dp.feed_update(bot, update))
-    return jsonify({"status": "ok"})
-
-# --- Health check ---
+# --- Health ---
 @app.route("/")
 def health():
-    return "GoaNest Bot живёт и парсит OLX 24/7 на Google Cloud Run!", 200
+    return "GoaNest Bot ЖИВЁТ на Cloud Run — 24/7 — OLX парсится — ДЕКАБРЬ 2025", 200
 
 # --- Запуск ---
 if __name__ == "__main__":
+    asyncio.run(startup())  # Запускаем стартап синхронно
     port = int(os.environ.get("PORT", 8080))
-    init_app()  # ← ЭТО ЗАМЕНЯЕТ @app.before_first_request
     app.run(host="0.0.0.0", port=port)
