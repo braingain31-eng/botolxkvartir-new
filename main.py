@@ -59,8 +59,12 @@ async def run_olx_parser():
         logger.error(f"Ошибка парсинга OLX: {e}", exc_info=True)
 
 # --- Старт ---
-@app.before_first_request
-def before_first_request():
+# @app.before_first_request
+# def before_first_request():
+#     asyncio.ensure_future(startup())
+
+def init_app():
+    """Инициализация при старте — вместо устаревшего @before_first_request"""
     asyncio.ensure_future(startup())
 
 async def startup():
@@ -108,4 +112,5 @@ def health():
 # --- Запуск ---
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
+    init_app()  # ← ЭТО ЗАМЕНЯЕТ @app.before_first_request
     app.run(host="0.0.0.0", port=port)
