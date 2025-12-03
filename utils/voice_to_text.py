@@ -23,23 +23,23 @@ async def voice_to_text(file_path: str, file_id: str = None) -> str | None:
     """
     try:
         if file_id:
-            cache_dir = "voice_cache"
-            os.makedirs(cache_dir, exist_ok=True)
-            cache_file = f"{cache_dir}/{hashlib.md5(file_id.encode()).hexdigest()}.pkl"
-            if os.path.exists(cache_file):
-                with open(cache_file, "rb") as f:
-                    return pickle.load(f)
+                cache_dir = "voice_cache"
+                os.makedirs(cache_dir, exist_ok=True)
+                cache_file = f"{cache_dir}/{hashlib.md5(file_id.encode()).hexdigest()}.pkl"
+                if os.path.exists(cache_file):
+                    with open(cache_file, "rb") as f:
+                        return pickle.load(f)
 
-        # Шаг 1: Транскрипция аудио (локально, бесплатно)
-        segments, _ = whisper_model.transcribe(file_path, beam_size=5, language="ru")  # Поддержка RU/EN
-        raw_text = " ".join(segment.text for segment in segments).strip()
-        
+        # Распознавание
+        segments, _ = model.transcribe(file_path, beam_size=5, language="ru")
+        text = " ".join(segment.text for segment in segments).strip()
+
         # Сохраняем в кэш
         if file_id and text:
             with open(cache_file, "wb") as f:
                 pickle.dump(text, f)
 
-        return refined_text
+        return text
         
     except Exception as e:
         logging.error(f"Voice-to-text error: {e}")
