@@ -32,7 +32,7 @@ dp = Dispatcher(storage=storage)
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{config.WEBHOOK_BASE_URL}{WEBHOOK_PATH}"
 
-# Регистрация роутеров
+# Регистрация роутеров  
 dp.include_router(start.router)
 dp.include_router(search.router)
 dp.include_router(payment.router)
