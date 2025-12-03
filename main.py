@@ -75,11 +75,14 @@ def webhook():
     try:
         update = types.Update.model_validate(request.get_json(force=True), context={"bot": bot})
         
-        # loop = asyncio.new_event_loop()
-        # asyncio.set_event_loop(loop)
-        # loop.run_until_complete(dp.feed_update(bot, update))
-        # loop.close()
-        asyncio.run(dp.feed_update(bot=bot, update=update))
+        future = dp.feed_update(bot=bot, update=update)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(future)
+        finally:
+            loop.run_until_complete(loop.shutdown_asyncgens())
+            loop.close()
 
         return jsonify({"status": "ok"}), 200
     except Exception as e:
