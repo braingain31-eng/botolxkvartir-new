@@ -14,9 +14,8 @@ from database.firebase_db import init_firebase
 from utils.scheduler import start_scheduler  # ← ТВОЙ ПЛАНИРОВЩИК
 
 # Импортируем роутеры
-from handlers import start, search, payment, agent, errors, payment_menu
+from handlers import start, search, payment, agent, errors
 from handlers.property import router as property_router
-from handlers.reminders import router as reminders_router  # если есть
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -39,9 +38,7 @@ dp.include_router(search.router)
 dp.include_router(payment.router)
 dp.include_router(agent.router)
 dp.include_router(errors.router)
-dp.include_router(payment_menu.router)
 dp.include_router(property_router)
-dp.include_router(reminders_router)  # если есть
 
 # --- ПАРСЕР OLX ---
 async def run_olx_parser():
