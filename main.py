@@ -50,15 +50,18 @@ WEBHOOK_URL = f"{config.WEBHOOK_BASE_URL}{WEBHOOK_PATH}"
 # --- АСИНХРОННЫЙ ВОРКЕР (СЕРДЦЕ БОТА) ---
 
 async def process_updates():
-    """Основной цикл обработки обновлений из очереди."""
-    logger.info("Воркер для обработки обновлений запущен.")
+    logger.info("[WEBHOOK DIAG 4/4] Воркер для обработки обновлений запущен и ждёт из очереди...")
     while True:
         try:
             update_json = update_queue.get(block=True)
+            update_id = update_json.get("update_id", "NO_ID")
+            logger.info(f"[WEBHOOK DIAG SUCCESS] Достаём из очереди update_id={update_id} и начинаем обработку")  # ← ДОБАВЬ ЭТУ СТРОЧКУ
+            
             update = types.Update.model_validate(update_json, context={"bot": bot})
             await dp.feed_update(bot=bot, update=update)
+            logger.info(f"[WEBHOOK DIAG DONE] update_id={update_id} успешно обработан")
         except Exception as e:
-            logger.error(f"Ошибка в воркере при обработке обновления: {e}", exc_info=True)
+            logger.error(f"[WEBHOOK DIAG FAIL] Ошибка при обработке update_id={update_id}: {e}", exc_info=True)
 
 async def main_async_logic():
     """Выполняет асинхронный старт и запускает обработку обновлений."""
@@ -94,11 +97,18 @@ def worker():
 @app.route(WEBHOOK_PATH, methods=["POST"])
 def webhook():
     """Мгновенно принимает обновления от Telegram и кладет в очередь."""
+    logger.info("[WEBHOOK DIAG 1/4] → Telegram прислал POST на /webhook")   # ← ДОБАВЬ ЭТУ СТРОЧКУ
     try:
-        update_queue.put(request.get_json(force=True))
+        update_json = request.get_json(force=True)
+        update_id = update_json.get("update_id", "NO_ID")
+        logger.info(f"[WEBHOOK DIAG 2/4] Получен update_id={update_id}, кладём в очередь")  # ← И ЭТУ
+        
+        update_queue.put(update_json)
+        logger.info(f"[WEBHOOK DIAG 3/4] update_id={update_id} успешно добавлен в очередь (размер очереди сейчас: {update_queue.qsize()})")  # ← И ЭТУ
+        
         return jsonify({"status": "ok"}), 200
     except Exception as e:
-        logger.error(f"Ошибка добавления в очередь вебхука: {e}", exc_info=True)
+        logger.error(f"[WEBHOOK DIAG ERROR] Ошибка добавления в очередь: {e}", exc_info=True)
         return jsonify({"error": "bad request"}), 400
 
 @app.route("/")
