@@ -3,6 +3,8 @@ from faster_whisper import WhisperModel  # Локальный STT (беспла�
 from openai import AsyncOpenAI
 import logging
 import config
+import hashlib
+import pickle
 
 # Инициализация локального Whisper (скачает модель ~1GB при первом запуске)
 whisper_model = WhisperModel("base", device="cpu", compute_type="int8")  # "small" для точности, "base" для скорости
@@ -14,44 +16,29 @@ grok_client = AsyncOpenAI(
     base_url="https://openrouter.ai/api/v1",  # Прокси-эндпоинт
 )
 
-async def voice_to_text(file_path: str) -> str | None:
+async def voice_to_text(file_path: str, file_id: str = None) -> str | None:
     """
     1. Локальный STT (Whisper) → текст из аудио.
     2. Grok-4 уточняет/улучшает текст (для поиска жилья в Гоа).
     """
     try:
+        if file_id:
+            cache_dir = "voice_cache"
+            os.makedirs(cache_dir, exist_ok=True)
+            cache_file = f"{cache_dir}/{hashlib.md5(file_id.encode()).hexdigest()}.pkl"
+            if os.path.exists(cache_file):
+                with open(cache_file, "rb") as f:
+                    return pickle.load(f)
+
         # Шаг 1: Транскрипция аудио (локально, бесплатно)
-        segments, _ = whisper_model.transcribe(file_path, language="ru")  # Поддержка RU/EN
-        raw_text = " ".join(segment.text.strip() for segment in segments).strip()
+        segments, _ = whisper_model.transcribe(file_path, beam_size=5, language="ru")  # Поддержка RU/EN
+        raw_text = " ".join(segment.text for segment in segments).strip()
         
-        if not raw_text:
-            logging.warning("Whisper не распознал аудио")
-            return None
-        
-        # Шаг 2: Уточнение через Grok-4 (бесплатный прокси)
-        prompt = f"""
-        Ты ассистент по поиску жилья в Гоа. Пользователь сказал: "{raw_text}".
-        
-        Уточни и структурируй запрос для поиска:
-        - Тип жилья (вилла, бунгало, комната)?
-        - Бюджет (в $/сутки или рупиях)?
-        - Даты (заезд/выезд)?
-        - Район (Анжуна, Арпора, Вагатор)?
-        - Кол-во человек?
-        - Другие пожелания (бассейн, Wi-Fi)?
-        
-        Верни только структурированный текст на русском, без лишнего.
-        """
-        
-        response = await grok_client.chat.completions.create(
-            model="x-ai/grok-4.1-fast:free",  # Бесплатная Grok-4.1 Fast на OpenRouter
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=150,
-            temperature=0.1,  # Низкая креативность для точности
-        )
-        
-        refined_text = response.choices[0].message.content.strip()
-        logging.info(f"Raw: '{raw_text}' → Refined by Grok: '{refined_text}'")
+        # Сохраняем в кэш
+        if file_id and text:
+            with open(cache_file, "wb") as f:
+                pickle.dump(text, f)
+
         return refined_text
         
     except Exception as e:

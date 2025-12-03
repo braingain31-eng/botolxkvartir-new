@@ -29,7 +29,7 @@ async def voice_search(message: Message):
     if not file_path:
         return await thinking.edit_text("Ошибка загрузки голосового")
 
-    text = await voice_to_text(file_path)
+    text = await voice_to_text(file_path, file_id=message.voice.file_id)
     if not text:
         return await thinking.edit_text("Не понял речь. Напишите текстом")
 

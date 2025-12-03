@@ -23,4 +23,5 @@ COPY . .
 # Use gunicorn for production.
 # The following command assumes that your Flask app object is named 'app' in 'main.py'.
 # For example: app = Flask(__name__)
-CMD ["gunicorn", "--workers", "4", "--threads", "4", "-b", "0.0.0.0:8080", "main:app"]
+# CMD ["gunicorn", "--workers", "4", "--threads", "4", "-b", "0.0.0.0:8080", "main:app"]
+CMD ["gunicorn", "--workers", "2", "--threads", "4", "--timeout", "120", "--keep-alive", "75", "-b", "0.0.0.0:8080", "main:app"]
