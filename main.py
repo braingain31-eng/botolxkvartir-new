@@ -68,13 +68,25 @@ async def main_async_logic():
     init_firebase()
     logger.info("Firebase инициализирован")
 
-    await start_scheduler()
+    start_scheduler()
     logger.info("Планировщик OLX запущен")
 
-    await bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True)
-    logger.info(f"Вебхук установлен: {WEBHOOK_URL}")
+    logger.info("Устанавливаем вебхук...")
+    try:
+        result = await bot.set_webhook(
+            url=WEBHOOK_URL,
+            drop_pending_updates=True,
+            timeout=10  # ← явно указываем короткий таймаут
+        )
+        logger.info(f"Вебхук успешно установлен: {WEBHOOK_URL}")
+    except Exception as e:
+        logger.error(f"НЕ УДАЛОСЬ установить вебхук: {e}")
+        logger.error(f"URL был: {WEBHOOK_URL}")
+        # НЕ прерываем выполнение — продолжаем работу бота даже без вебхука
+        logger.warning("Продолжаем работу без вебхука (можно переключиться на polling позже")
 
-    await process_updates() # Запускаем бесконечный цикл обработки
+    logger.info("[WEBHOOK DIAG 4/4] Воркер обработки обновлений СТАРТАНУЛ — начинаем читать очередь")
+    await process_updates()  # ← теперь точно дойдёт сюда
 
 def worker():
     """
