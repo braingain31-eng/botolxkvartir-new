@@ -31,7 +31,7 @@ async def voice_to_text(file_path: str, file_id: str = None) -> str | None:
                         return pickle.load(f)
 
         # Распознавание
-        segments, _ = model.transcribe(file_path, beam_size=5, language="ru")
+        segments, _ = whisper_model.transcribe(file_path, beam_size=5, language="ru")
         text = " ".join(segment.text for segment in segments).strip()
 
         # Сохраняем в кэш
