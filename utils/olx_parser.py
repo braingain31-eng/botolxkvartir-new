@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # Новый прокси из примера
 PROXY_URL = 'http://brd-customer-hl_8b4b2a1a-zone-residential_proxy2:3u94ok69p04q@brd.superproxy.io:33335'
 
-BASE_URL = "https://www.olx.in/for-rent-houses-apartments_c1723"
+BASE_URL = "https://www.olx.in/goa_g2001153/for-rent-houses-apartments_c1723"
 
 # Список северных районов Гоа для фильтрации
 NORTH_GOA_AREAS = [
@@ -25,33 +25,53 @@ NORTH_GOA_AREAS = [
     "Mapusa", "Agarwado", "Pilerne", "Palolem", "Agonda"
 ]
 
-def normalize_location(location_text: str) -> str:
-    """Улучшенная нормализация с более мягкой фильтрацией"""
-    if not location_text:
-        return "Other North Goa"
+# def normalize_location(location_text: str) -> str:
+#     """Улучшенная нормализация с более мягкой фильтрацией"""
+#     if not location_text:
+#         return "Other North Goa"
     
-    original_location = location_text
-    normalized = location_text.lower().strip()
+#     original_location = location_text
+#     normalized = location_text.lower().strip()
     
-    # Убираем лишние слова
-    for word in ["goa", "north goa", "goa north", "beach", "road", "near", "opp", "opposite", "nearby"]:
-        normalized = normalized.replace(word, "").strip()
+#     # Убираем лишние слова
+#     for word in ["goa", "north goa", "goa north", "beach", "road", "near", "opp", "opposite", "nearby"]:
+#         normalized = normalized.replace(word, "").strip()
     
-    # Проверяем наличие целевых районов (более мягкая проверка)
-    for area in NORTH_GOA_AREAS:
-        area_variants = [area.lower(), area.lower().replace(" ", ""), area.lower().replace(" ", "") + "beach"]
-        for variant in area_variants:
-            if variant in normalized or variant in original_location.lower():
-                logger.debug(f"Обнаружен район '{area}' в локации: {original_location}")
-                return area
+#     # Проверяем наличие целевых районов (более мягкая проверка)
+#     for area in NORTH_GOA_AREAS:
+#         area_variants = [area.lower(), area.lower().replace(" ", ""), area.lower().replace(" ", "") + "beach"]
+#         for variant in area_variants:
+#             if variant in normalized or variant in original_location.lower():
+#                 logger.debug(f"Обнаружен район '{area}' в локации: {original_location}")
+#                 return area
     
-    # Если не найдено точное соответствие, но есть упоминание Гоа, сохраняем как Other North Goa
-    if any(word in original_location.lower() for word in ["goa", "north goa"]):
-        logger.debug(f"Локация '{original_location}' не содержит конкретных районов, сохранена как Other North Goa")
-        return "Other North Goa"
+#     # Если не найдено точное соответствие, но есть упоминание Гоа, сохраняем как Other North Goa
+#     if any(word in original_location.lower() for word in ["goa", "north goa"]):
+#         logger.debug(f"Локация '{original_location}' не содержит конкретных районов, сохранена как Other North Goa")
+#         return "Other North Goa"
     
-    logger.debug(f"Локация '{original_location}' не соответствует ни одному целевому району, пропускается")
-    return None  # Явно возвращаем None для пропуска
+#     logger.debug(f"Локация '{original_location}' не соответствует ни одному целевому району, пропускается")
+#     return None  # Явно возвращаем None для пропуска
+
+def normalize_location(location_text: str) -> str | None:
+    """
+    Проверяет, есть ли в тексте локации хотя бы один район из NORTH_GOA_AREAS.
+    Всё приводится к нижнему регистру — никаких лишних слов, пляжей, дорог и т.д. не убираем.
+    Возвращает название района из списка NORTH_GOA_AREAS или None.
+    """
+    if not location_text or not location_text.strip():
+        return None
+
+    text_lower = location_text.lower()
+
+    for area in NORTH_GOA_AREAS:               # ← твой список: ["Anjuna", "Arpora", "Vagator", ...]
+        area_lower = area.lower()
+        if area_lower in text_lower:           # простая подстрока — работает даже с "anjuna beach", "vagator road" и т.д.
+            logger.debug(f"Найден район '{area}' в локации: {location_text}")
+            return area
+
+    logger.debug(f"Район не найден в локации: {location_text}")
+    return None
 
 def get_page_html(page: int = 1) -> str | None:
     """Получает HTML страницы с увеличенными таймаутами и повторными попытками"""
