@@ -47,10 +47,10 @@ async def text_search(message: Message):
 
 # === ГЛАВНЫЙ УМНЫЙ ПОИСК ===
 async def smart_search(message: Message, user_query: str):
-    # Шаг 1: Отправляем в Grok с промптом, который не требует обязательных уточнений
-    thinking_msg = await message.answer("Думаю...")
-
-    grok_response = await ask_grok(f"""
+    thinking = await message.answer("Ищу лучшие варианты...")
+    
+    # Шаг 1: Формируем промпт для Grok с поддержкой количества
+    prompt = f"""
     Ты — ассистент по поиску жилья в Гоа. Пользователь хочет найти подходящие варианты.
 
     Пользовательский запрос: "{user_query}"
@@ -68,14 +68,22 @@ async def smart_search(message: Message, user_query: str):
             "has_pool": true | false | null,
             "owner_type": "private" | null
         }},
-        "sort": "price_asc" | "price_desc" | "newest" | null
+        "sort": "price_asc" | "price_desc" | "newest" | null,
+        "limit": 5 | null  // Максимальное количество вариантов (если указано в запросе)
     }}
 
     Если запрос понятен — делай поиск. Если нет конкретики — ставь разумные значения (например, price до 25000 и sort по цене).
-    Не пиши ничего кроме JSON..
-    """)
+    Если клиент указал количество (например "2 варианта", "покажи 5"), ставь в limit это число, иначе null.
+    Не пиши ничего кроме JSON.
+    """
 
-    # --- САМЫЙ ЖЁСТКИЙ ПАРСЕР В МИРЕ ---
+    logger.info(f"Отправляем промпт в Grok: {prompt[:500]}...")  # Лог запроса (первые 500 символов)
+
+    grok_response = await ask_grok(prompt)
+
+    logger.info(f"Получен ответ от Grok: {grok_response[:500]}...")  # Лог ответа (первые 500 символов)
+
+    # Шаг 2: Парсинг JSON
     json_str = grok_response.strip()
     json_str = re.sub(r"^```json\s*", "", json_str, flags=re.IGNORECASE)
     json_str = re.sub(r"```$", "", json_str).strip()
@@ -84,12 +92,13 @@ async def smart_search(message: Message, user_query: str):
         data = json.loads(json_str)
     except Exception as e:
         logger.warning(f"Grok вернул невалидный JSON, используем дефолт. Ошибка: {e}\nОтвет был: {grok_response[:300]}")
-        data = {"action": "search", "filters": {}, "sort": "price_asc"}
+        data = {"action": "search", "filters": {}, "sort": "price_asc", "limit": null}
 
-    await thinking_msg.delete()
+    await thinking.delete()
 
     filters = {k: v for k, v in data.get("filters", {}).items() if v is not None}
     sort = data.get("sort", "price_asc")
+    limit = data.get("limit", 20)  # Если limit от Grok null — 20 по умолчанию
 
     # Превращаем sort в order_by для Firebase
     order_by = {
@@ -99,11 +108,11 @@ async def smart_search(message: Message, user_query: str):
     }.get(sort, "price_day_inr")
 
     # Основной поиск
-    props = get_properties(filters=filters, order_by=order_by, limit=20)
+    props = get_properties(filters=filters, order_by=order_by, limit=limit)
 
     # Если ничего — ищем вообще всё
     if not props:
-        props = get_properties(order_by="price_day_inr", limit=20)
+        props = get_properties(order_by="price_day_inr", limit=limit)
         if props:
             await message.answer("По твоим критериям ничего не нашёл.\nВот что есть прямо сейчас (по возрастанию цены):")
         else:
