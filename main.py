@@ -68,15 +68,14 @@ async def main_async_logic():
     init_firebase()
     logger.info("Firebase инициализирован")
 
-    start_scheduler()
+    asyncio.create_task(start_scheduler())
     logger.info("Планировщик OLX запущен")
 
     logger.info("Устанавливаем вебхук...")
     try:
         result = await bot.set_webhook(
             url=WEBHOOK_URL,
-            drop_pending_updates=True,
-            timeout=10  # ← явно указываем короткий таймаут
+            drop_pending_updates=True
         )
         logger.info(f"Вебхук успешно установлен: {WEBHOOK_URL}")
     except Exception as e:
