@@ -25,6 +25,10 @@ logger = logging.getLogger(__name__)
 # --- ГЛОБАЛЬНЫЕ ОБЪЕКТЫ ---
 # Эти объекты создаются в основном потоке, но будут использоваться
 # в фоновом потоке, где запущен asyncio loop.
+# Добавь глобальный флаг в начало файла (рядом с update_queue)
+scheduler_started = False
+webhook_set = False
+
 update_queue = queue.Queue()
 bot = Bot(
     token=config.TELEGRAM_BOT_TOKEN,
@@ -64,28 +68,33 @@ async def process_updates():
             logger.error(f"[WEBHOOK DIAG FAIL] Ошибка при обработке update_id={update_id}: {e}", exc_info=True)
 
 async def main_async_logic():
-    """Выполняет асинхронный старт и запускает обработку обновлений."""
+    global scheduler_started, webhook_set
+    
     init_firebase()
     logger.info("Firebase инициализирован")
 
-    asyncio.create_task(start_scheduler())
-    logger.info("Планировщик OLX запущен")
+    # 1. Запускаем планировщик ТОЛЬКО ОДИН РАЗ
+    if not scheduler_started:
+        asyncio.create_task(start_scheduler())
+        scheduler_started = True
+        logger.info("Планировщик OLX запущен в фоне (один раз за всю жизнь контейнера)")
 
-    logger.info("Устанавливаем вебхук...")
-    try:
-        result = await bot.set_webhook(
-            url=WEBHOOK_URL,
-            drop_pending_updates=True
-        )
-        logger.info(f"Вебхук успешно установлен: {WEBHOOK_URL}")
-    except Exception as e:
-        logger.error(f"НЕ УДАЛОСЬ установить вебхук: {e}")
-        logger.error(f"URL был: {WEBHOOK_URL}")
-        # НЕ прерываем выполнение — продолжаем работу бота даже без вебхука
-        logger.warning("Продолжаем работу без вебхука (можно переключиться на polling позже")
+    # 2. Устанавливаем вебхук ТОЛЬКО ОДИН РАЗ
+    if not webhook_set:
+        logger.info("Устанавливаем вебхук один раз...")
+        try:
+            await bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True)
+            webhook_set = True
+            logger.info(f"Вебхук успешно установлен: {WEBHOOK_URL}")
+        except Exception as e:
+            if "Flood control" in str(e) or "retry after" in str(e):
+                logger.warning("Вебхук уже установлен (flood control) — пропускаем")
+                webhook_set = True  # считаем, что он уже есть
+            else:
+                logger.error(f"Критическая ошибка вебхука: {e}")
 
-    logger.info("[WEBHOOK DIAG 4/4] Воркер обработки обновлений СТАРТАНУЛ — начинаем читать очередь")
-    await process_updates()  # ← теперь точно дойдёт сюда
+    logger.info("Бот полностью готов — начинаем обработку обновлений")
+    await process_updates()
 
 def worker():
     """
