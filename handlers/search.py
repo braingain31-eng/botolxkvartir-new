@@ -119,9 +119,15 @@ async def smart_search(message: Message, user_query: str):
             await message.answer("Пока нет ни одного варианта в базе 😔\nСкоро будут!")
             return
     else:
-        count_text = f"Найдено {len(props)} вариант{'ов' if len(props) > 1 else ''}"
+        count_text = f"Нашёл {len(props)} подходящих вариант{'ов' if len(props) > 1 else ''}"
         if filters:
-            await message.answer(f"{count_text} по твоему запросу:")
+            await message.answer(f"""{count_text}
+            
+                    Сначала покажу самые точные по твоему запросу  
+                    Потом всё остальное по убыванию релевантности  
+
+                    Не переживай — ничего не спрятано  
+                    Просто чтобы ты сразу увидел лучшее:""")
         else:
             await message.answer(f"{count_text} (все доступные):")
 
@@ -130,6 +136,7 @@ async def smart_search(message: Message, user_query: str):
 
 # === Отправка карточек с кэшированием фото ===
 async def show_results(message: Message, props: list):
+    i = 0
     for p in props:
         title = p.get("title", "Жильё в Гоа")
         area = p.get("area", "Гоа")
@@ -146,6 +153,12 @@ async def show_results(message: Message, props: list):
         kb.button(text="Написать хозяину", callback_data=f"contact_{p.get('id')}")
 
         await send_cached_photo(message, photo_url, caption, kb.as_markup())
+        
+        if i < 10:
+            await message.answer("""Ты уже прошёл топ-10 самых подходящих  
+                                Дальше идут хорошие, но чуть менее точные  
+                                Всё честно и по делу""")
+        i = i + 1
 
     await message.answer("Хотите больше вариантов — уточните запрос!")
 

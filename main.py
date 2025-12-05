@@ -75,16 +75,16 @@ async def main_async_logic():
 
     # 1. Запускаем планировщик ТОЛЬКО ОДИН РАЗ
     if not scheduler_started:
-        asyncio.create_task(start_scheduler())
         scheduler_started = True
+        asyncio.create_task(start_scheduler())
         logger.info("Планировщик OLX запущен в фоне (один раз за всю жизнь контейнера)")
 
     # 2. Устанавливаем вебхук ТОЛЬКО ОДИН РАЗ
     if not webhook_set:
+        webhook_set = True
         logger.info("Устанавливаем вебхук один раз...")
         try:
             await bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True)
-            webhook_set = True
             logger.info(f"Вебхук успешно установлен: {WEBHOOK_URL}")
         except Exception as e:
             if "Flood control" in str(e) or "retry after" in str(e):
