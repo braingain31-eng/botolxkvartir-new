@@ -12,7 +12,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 import config
 from database.firebase_db import init_firebase
-from utils.scheduler import start_scheduler
+from utils.scheduler import start_scheduler, run_olx_parser_now
 
 # Импортируем роутеры
 from handlers import start, search, payment, agent, errors
@@ -76,7 +76,8 @@ async def main_async_logic():
     # 1. Запускаем планировщик ТОЛЬКО ОДИН РАЗ
     if not scheduler_started:
         scheduler_started = True
-        asyncio.create_task(start_scheduler())
+        asyncio.create_task(run_olx_parser_now())
+        # asyncio.create_task(start_scheduler())
         logger.info("Планировщик OLX запущен в фоне (один раз за всю жизнь контейнера)")
 
     # 2. Устанавливаем вебхук ТОЛЬКО ОДИН РАЗ
@@ -135,6 +136,13 @@ def webhook():
 def health_check():
     """Проверка жизнеспособности для Cloud Run."""
     return "GoaNest Bot is alive!", 200
+
+@app.route("/cron/parse-olx")
+async def cron_parse_olx():
+    """Эндпоинт для Cloud Scheduler — запускает парсинг вручную"""
+    logger.info("Cloud Scheduler запустил принудительный парсинг OLX")
+    asyncio.create_task(run_olx_parser_now())  # в фоне, не блокируем ответ
+    return "OLX parsing started", 200
 
 # --- ЗАПУСК ---
 # Gunicorn (или другой WSGI-сервер) загрузит этот файл.

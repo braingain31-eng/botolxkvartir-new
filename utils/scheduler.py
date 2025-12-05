@@ -10,36 +10,41 @@ logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
 
 async def run_olx_parser_now():
-    """Выполняет парсинг только если прошло более 6 часов с последнего успешного парсинга"""
+    """Парсит OLX только если прошло ≥6 часов с последнего УСПЕШНОГО парсинга"""
     try:
-        # Получаем последний успешный парсинг
-        all_properties = get_properties(limit=1)
-        if not all_properties:
-            logger.info("База пуста, выполняем парсинг")
+        # Берём ВСЁ, но только поле parsed_at (экономим трафик)
+        props = get_properties(order_by="-parsed_at", limit=1)  # ← САМОЕ ГЛАВНОЕ ИЗМЕНЕНИЕ
+        
+        if not props:
+            logger.info("База пуста → запускаем парсинг")
         else:
-            # Находим самое свежее объявление для определения времени последнего парсинга
-            latest_property = max(all_properties, key=lambda x: x.get('parsed_at', ''))
-            last_parsed_str = latest_property.get('parsed_at')
+            latest = props[0]  # уже отсортировано по убыванию → первое = самое новое
+            parsed_at_str = latest.get("parsed_at")
             
-            if last_parsed_str:
+            if not parsed_at_str:
+                logger.info("В базе есть объекты, но нет поля parsed_at → запускаем парсинг")
+            else:
                 try:
-                    last_parsed_time = datetime.fromisoformat(last_parsed_str.replace('Z', '+00:00'))
-                    time_since_last_parse = datetime.now(last_parsed_time.tzinfo) - last_parsed_time
-                    
-                    if time_since_last_parse < timedelta(hours=6):
-                        hours_left = 6 - time_since_last_parse.total_seconds() / 3600
-                        logger.info(f"Последний парсинг был {time_since_last_parse.total_seconds()/3600:.1f} часов назад. "
-                                  f"Следующий парсинг через {hours_left:.1f} часов.")
+                    # Правильно парсим ISO с Z
+                    parsed_at = datetime.fromisoformat(parsed_at_str.replace("Z", "+00:00"))
+                    now = datetime.now(parsed_at.tzinfo)
+                    hours_since = (now - parsed_at).total_seconds() / 3600
+
+                    if hours_since < 6:
+                        logger.info(f"Последний парсинг был {hours_since:.1f} ч назад → пропускаем (ещё рано)")
                         return
+                    else:
+                        logger.info(f"Последний парсинг был {hours_since:.1f} ч назад → пора обновлять")
                 except Exception as e:
-                    logger.warning(f"Не удалось определить время последнего парсинга: {e}. Выполняем парсинг.")
-        
-        logger.info("Выполняем парсинг OLX...")
+                    logger.warning(f"Ошибка парсинга даты parsed_at: {e} → запускаем парсинг на всякий случай")
+
+        # Если дошли сюда — парсим
+        logger.info("Начинаем парсинг OLX...")
         added = await parse_olx_listing()
-        logger.info(f"Парсинг завершён. Добавлено: {added} объектов")
-        
+        logger.info(f"Парсинг завершён. Добавлено новых: {added}")
+
     except Exception as e:
-        logger.error(f"Ошибка при выполнении парсинга: {e}")
+        logger.error(f"Критическая ошибка в run_olx_parser_now: {e}", exc_info=True)
 
 async def start_scheduler():
     """Запускает планировщик с проверкой времени последнего парсинга"""
