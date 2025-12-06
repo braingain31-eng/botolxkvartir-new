@@ -97,6 +97,9 @@ async def show_more_properties(call: CallbackQuery):
 async def smart_search(message: Message, user_query: str):
     thinking = await message.answer("Ищу лучшие варианты...")
     
+    # Формируем строку со всеми районами для промпта
+    areas_list = " | ".join([f'"{area}"' for area in NORTH_GOA_DEFAULT_AREAS])
+    
     # Шаг 1: Формируем промпт для Grok с поддержкой количества
     prompt = f"""
     Ты — ассистент по поиску жилья в Гоа. Пользователь хочет найти подходящие варианты.
