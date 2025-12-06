@@ -50,6 +50,48 @@ async def text_search(message: Message):
         return  # команды не трогаем
     await smart_search(message, message.text)
 
+@router.callback_query(lambda c: c.data and c.data.startswith("more_"))
+async def show_more_properties(call: CallbackQuery):
+    try:
+        offset = int(call.data.split("_")[1])
+    except:
+        await call.answer("Ошибка", show_alert=True)
+        return
+
+    # Получаем кэшированные объявления
+    remaining_props = getattr(call.bot, "search_cache", {}).get(call.from_user.id, [])
+    
+    if not remaining_props:
+        await call.message.edit_text("Больше вариантов нет")
+        await call.answer()
+        return
+
+    next_chunk = remaining_props[:10]
+    new_offset = offset + 10
+
+    # Отправляем следующий чанк
+    for i, p in enumerate(next_chunk, start=offset + 1):
+        await _send_property_card(call.message, p, i)
+
+    # Обновляем кэш
+    call.bot.search_cache[call.from_user.id] = remaining_props[10:]
+
+    # Кнопка "Ещё", если остались
+    still_more = len(call.bot.search_cache.get(call.from_user.id, []))
+    if still_more > 0:
+        kb = InlineKeyboardBuilder()
+        kb.button(
+            text=f"Ещё {min(still_more, 10)} из {still_more} ",
+            callback_data=f"more_{new_offset}"
+        )
+        await call.message.answer("Есть ещё интересные варианты!", reply_markup=kb.as_markup())
+    else:
+        await call.message.answer("Это всё! Больше нет вариантов по вашему запросу")
+        # Очищаем кэш
+        if call.from_user.id in call.bot.search_cache:
+            del call.bot.search_cache[call.from_user.id]
+
+    await call.answer()
 
 # === ГЛАВНЫЙ УМНЫЙ ПОИСК ===
 async def smart_search(message: Message, user_query: str):
@@ -165,34 +207,92 @@ async def smart_search(message: Message, user_query: str):
     await show_results(message, props)
 
 
-# === Отправка карточек с кэшированием фото ===
+# # === Отправка карточек с кэшированием фото ===
+# async def show_results(message: Message, props: list):
+#     for index, p in enumerate(props, start=1):
+#         title = p.get("title", "Жильё в Гоа")
+#         area = p.get("area", "Гоа")
+#         price_inr = p.get("price_day_inr", 0)
+#         guests = p.get("guests", 2)
+#         photo_url = p.get("photos", [None])[0]
+
+#         caption = f"<b>{title}</b>\n" \
+#                   f"{area} • ₹{price_inr}/сутки\n" \
+#                   f"до {guests} гостей"
+
+#         kb = InlineKeyboardBuilder()
+#         kb.button(text="Подробнее", callback_data=f"prop_{p.get('id')}")
+#         kb.button(text="Написать хозяину", callback_data=f"contact_{p.get('id')}")
+
+#         await send_cached_photo(message, photo_url, caption, kb.as_markup())
+
+#         if index == 10 and len(props) > 10:
+#             await message.answer(
+#                 "Ты уже прошёл топ-10 самых подходящих\n"
+#                 "Дальше идут хорошие, но чуть менее точные\n"
+#                 "Всё честно и по делу"
+#             )
+
+    # await message.answer("Хотите больше вариантов — уточните запрос!")
+
 async def show_results(message: Message, props: list):
-    for index, p in enumerate(props, start=1):
-        title = p.get("title", "Жильё в Гоа")
-        area = p.get("area", "Гоа")
-        price_inr = p.get("price_day_inr", 0)
-        guests = p.get("guests", 2)
-        photo_url = p.get("photos", [None])[0]
+    if not props:
+        await message.answer("Ничего не найдено. Попробуйте изменить запрос.")
+        return
 
-        caption = f"<b>{title}</b>\n" \
-                  f"{area} • ₹{price_inr}/сутки\n" \
-                  f"до {guests} гостей"
+    total = len(props)
+    chunk_size = 10
 
+    # Отправляем первые 10
+    for i, p in enumerate(props[:chunk_size], start=1):
+        await _send_property_card(message, p, i)
+
+    # Если объявлений больше 10 — показываем кнопку "Ещё"
+    if total > chunk_size:
+        remaining = total - chunk_size
         kb = InlineKeyboardBuilder()
-        kb.button(text="Подробнее", callback_data=f"prop_{p.get('id')}")
-        kb.button(text="Написать хозяину", callback_data=f"contact_{p.get('id')}")
+        kb.button(
+            text=f"Показать ещё {min(remaining, chunk_size)} из {remaining} ",
+            callback_data=f"more_{chunk_size}"  # начало следующего чанка
+        )
+        await message.answer(
+            "Это только начало!\n"
+            "Я нашёл ещё варианты — хочешь посмотреть?",
+            reply_markup=kb.as_markup()
+        )
+    else:
+        await message.answer("Это все доступные варианты на данный момент\nХочешь другой поиск — просто напиши")
 
-        await send_cached_photo(message, photo_url, caption, kb.as_markup())
+    # Сохраняем оставшиеся объявления в состояние пользователя
+    if total > chunk_size:
+        from aiogram.fsm.context import FSMContext
+        from aiogram.fsm.storage.memory import MemoryStorage
+        
+        # Если используешь FSMContext — передавай его в функцию
+        # Здесь пример с простым кэшем в памяти (для примера)
+        if not hasattr(message.bot, "search_cache"):
+            message.bot.search_cache = {}
+        message.bot.search_cache[message.from_user.id] = props[chunk_size:]
 
-        if index == 10 and len(props) > 10:
-            await message.answer(
-                "Ты уже прошёл топ-10 самых подходящих\n"
-                "Дальше идут хорошие, но чуть менее точные\n"
-                "Всё честно и по делу"
-            )
+async def _send_property_card(message_or_call, prop: dict, number: int):
+    title = prop.get("title", "Жильё в Гоа")
+    area = prop.get("area", "Гоа")
+    price_inr = prop.get("price_day_inr", 0)
+    guests = prop.get("guests", 2)
+    photo_url = prop.get("photos", [None])[0]
 
-    await message.answer("Хотите больше вариантов — уточните запрос!")
+    caption = f"<b>{number}. {title}</b>\n" \
+              f"{area} • ₹{price_inr:,}/сутки\n" \
+              f"до {guests} гостей".replace(",", " ")
 
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Подробнее", callback_data=f"prop_{prop.get('id')}")
+    kb.button(text="Написать хозяину", callback_data=f"contact_{prop.get('id')}")
+
+    if isinstance(message_or_call, Message):
+        await send_cached_photo(message_or_call, photo_url, caption, kb.as_markup())
+    else:  # CallbackQuery
+        await send_cached_photo(message_or_call.message, photo_url, caption, kb.as_markup())
 
 # === Кэширование и отправка фото ===
 async def send_cached_photo(message, photo_url: str, caption: str, reply_markup=None):

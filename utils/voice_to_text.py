@@ -63,7 +63,7 @@ async def voice_to_text(file_path: str, file_id: str = None) -> str | None:
 
     except openai.RateLimitError as e:
         logger.error("OpenAI Rate Limit! Подожди немного...")
-        return "Извини, я сейчас немного перегружен. Попробуй через пару секунд ещё раз"
+        return None
     
     except openai.APIError as e:
         logger.error(f"OpenAI API Error: {e}")
