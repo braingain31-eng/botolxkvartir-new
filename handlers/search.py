@@ -98,6 +98,7 @@ async def smart_search(message: Message, user_query: str):
     thinking = await message.answer("Ищу лучшие варианты...")
     
     # Формируем строку со всеми районами для промпта
+    areas_str = ", ".join(NORTH_GOA_DEFAULT_AREAS)
     areas_list = " | ".join([f'"{area}"' for area in NORTH_GOA_DEFAULT_AREAS])
 
     # Шаг 1: Формируем промпт для Grok с поддержкой количества
