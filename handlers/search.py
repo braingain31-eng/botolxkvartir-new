@@ -282,7 +282,7 @@ async def _send_property_card(message_or_call, prop: dict, number: int):
     photo_url = prop.get("photos", [None])[0]
 
     caption = f"<b>{number}. {title}</b>\n" \
-              f"{area} • ₹{price_inr:,}/сутки\n" \
+              f"{area} • ₹{price_inr:,}\n" \
               f"до {guests} гостей".replace(",", " ")
 
     kb = InlineKeyboardBuilder()
