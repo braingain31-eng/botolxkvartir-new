@@ -89,33 +89,6 @@ def get_properties(
 
         return results
 
-    except FailedPrecondition as e:
-        # Это и есть ошибка отсутствия индекса!
-        if "index" in str(e).lower() and "create it here" in str(e):
-            # Извлекаем ссылку на создание индекса из сообщения
-            match = re.search(r"https?://[^\s]+", str(e))
-            if match:
-                index_url = match.group(0)
-                logger.warning(f"Требуется индекс Firestore! Создаём автоматически: {index_url}")
-
-                # Автоматически создаём индекс через клик по ссылке (ха-ха, нет)
-                # Но мы можем вывести понятное сообщение и продолжить с fallback
-                logger.info("Падаем обратно на простой запрос без сложных фильтров...")
-
-                # Fallback: ищем только по status == active и сортируем по цене (индекс на это точно есть)
-                fallback_query = db.collection('properties') \
-                    .where(filter=FieldFilter("status", "==", "active")) \
-                    .order_by("price_day_inr") \
-                    .limit(limit)
-
-                docs = fallback_query.stream()
-                results = [doc.to_dict() | {"id": doc.id} for doc in docs]
-                logger.info(f"Используем fallback-запрос, найдено {len(results)} объектов")
-                return results
-            else:
-                logger.error(f"Ошибка индекса, но ссылка не найдена: {e}")
-        raise  # если не та ошибка — пробрасываем дальше
-
     except Exception as e:
         logger.error(f"Ошибка в get_properties: {e}")
         return []
