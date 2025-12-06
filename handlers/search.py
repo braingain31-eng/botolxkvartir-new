@@ -108,8 +108,8 @@ async def smart_search(message: Message, user_query: str):
     {{
         "action": "search",
         "filters": {{
-            "area": "Anjuna" | "Arpora" | "Vagator" | null,
-            "price_day_inr__lte": 25000 | null,
+            "area": {areas_list} | null,
+            "price_day_inr__lte": 30000 | null,
             "price_day_inr__gte": 8000 | null,
             "bedrooms__gte": 1 | null,
             "guests__gte": 2 | null,
@@ -117,19 +117,24 @@ async def smart_search(message: Message, user_query: str):
             "owner_type": "private" | null
         }},
         "sort": "price_asc" | "price_desc" | "newest" | null,
-        "limit": 5 | null  // Максимальное количество вариантов (если указано в запросе)
+        "limit": 10 | null
     }}
 
-    Если запрос понятен — делай поиск. Если нет конкретики — ставь разумные значения (например, price до 25000 и sort по цене).
-    Если клиент указал количество (например "2 варианта", "покажи 5"), ставь в limit это число, иначе null.
-    Не пиши ничего кроме JSON.
+    Правила:
+    - Если пользователь указал район — используй его точно
+    - Если не указал — поставь area: null (потом мы сами добавим фильтр по всему северу)
+    - Если сказано "самые дешевые", "дешево", "бюджетно" — sort: "price_asc"
+    - Если сказано "новые", "недавно добавленные" — sort: "newest"
+    - Если указано количество ("5 вариантов", "покажи 3") — поставь в limit это число
+    - Если ничего не указано — limit: null (по умолчанию покажем 10–15)
+    - Не пиши ничего кроме чистого JSON
     """
 
     logger.info(f"Отправляем промпт в Grok: {prompt[:500]}...")  # Лог запроса (первые 500 символов)
 
     grok_response = await ask_grok(prompt)
 
-    logger.info(f"Получен ответ от Grok: {grok_response[:500]}...")  # Лог ответа (первые 500 символов)
+    logger.info(f"Получен ответ от Grok: {grok_response[:900]}...")  # Лог ответа (первые 500 символов)
 
     # Шаг 2: Парсинг JSON
     json_str = grok_response.strip()
