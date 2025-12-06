@@ -101,7 +101,6 @@ async def smart_search(message: Message, user_query: str):
     areas_str = ", ".join(NORTH_GOA_DEFAULT_AREAS)
     areas_list = " | ".join([f'"{area}"' for area in NORTH_GOA_DEFAULT_AREAS])
 
-    # Шаг 1: Формируем промпт для Grok с поддержкой количества
     prompt = f"""
     Ты — ассистент по поиску жилья ТОЛЬКО в Северном Гоа.
     Доступные районы (ОБЯЗАТЕЛЬНО выбирай только из них): {areas_str}
@@ -127,27 +126,21 @@ async def smart_search(message: Message, user_query: str):
 
     ЖЁСТКИЕ ПРАВИЛА:
     1. Поле "area" может быть:
-    - строкой: "Arambol" — если указан один район
-    - массивом: ["Arambol", "Morjim"] — если указано несколько районов
-    - null — если район не из списка выше
-    2 Поддерживай все варианты написания:
-    арамбол, арамболе, arambol, morjim, морджим, мандрем, мандрем, ашвем, вагатор, анжуна и т.д.
-    3 Если пользователь написал "арамбол и морджим", "анжуна или вагатор", "в арамболе или рядом" — верни массив из этих районов
-    4 Если пользователь сказал "любой район", "где угодно", "по всему северу" — поставь null
-    5 Если запрос про долгосрок ("на месяц", "месяц и более", "долгосрочно") — ставь price_day_inr__lte: 2000–2500
-    6 НИКОГДА не придумывай свои районы — только из списка: {areas_str}
-    7. Если сказано "самые дешевые", "дешево", "бюджетно" — sort: "price_asc"
-    8. Если сказано "новые", "недавно добавленные" — sort: "newest"
-    9. Если указано количество ("5 вариантов", "покажи 3") — поставь в limit это число
-    10. НИКОГДА не пиши пояснения — только JSON
+       - строкой: "Arambol" — если один район
+       - массивом: ["Arambol", "Morjim"] — если несколько
+       - null — если район не из списка
+    2. Поддерживай все варианты: арамбол, арамболе, arambol, morjim, морджим и т.д.
+    3. Если "на месяц" или "долгосрочно" — ставь price_day_inr__lte: 2000–2500
+    4. Если сказано "самые дешевые" — sort: "price_asc"
+    5. Если указано количество ("5 вариантов") — ставь в limit это число
+    6. НИКОГДА не пиши пояснения — только JSON
     """
-    logger.info(f"Отправляем промпт в Grok: {prompt[:500]}...")  # Лог запроса (первые 500 символов)
 
+    logger.info(f"Отправляем промпт в Grok: {prompt[:500]}...")
     grok_response = await ask_grok(prompt)
+    logger.info(f"Получен ответ от Grok: {grok_response[:900]}...")
 
-    logger.info(f"Получен ответ от Grok: {grok_response[:900]}...")  # Лог ответа (первые 500 символов)
-
-    # Шаг 2: Парсинг JSON
+    # Парсинг JSON
     json_str = grok_response.strip()
     json_str = re.sub(r"^```json\s*", "", json_str, flags=re.IGNORECASE)
     json_str = re.sub(r"```$", "", json_str).strip()
@@ -155,71 +148,95 @@ async def smart_search(message: Message, user_query: str):
     try:
         data = json.loads(json_str)
     except Exception as e:
-        logger.warning(f"Grok вернул невалидный JSON, используем дефолт. Ошибка: {e}\nОтвет был: {grok_response[:300]}")
-        data = {"action": "search", "filters": {}, "sort": "price_asc", "limit": null}
+        logger.warning(f"Grok вернул битый JSON: {e}. Используем дефолт.")
+        data = {"action": "search", "filters": {}, "sort": "price_asc", "limit": None}
 
     await thinking.delete()
 
-    filters = {k: v for k, v in data.get("filters", {}).items() if v is not None}
+    # === ОБРАБОТКА ФИЛЬТРОВ ===
+    raw_filters = data.get("filters", {})
+    filters = {k: v for k, v in raw_filters.items() if v is not None}
 
-    raw_area = data.get("filters", {}).get("area")
+    # === ОБРАБОТКА РАЙОНОВ ===
+    raw_area = raw_filters.get("area")
+    selected_areas = []
 
     if raw_area:
-        # Приводим к единому виду: всегда список
-        if isinstance(raw_area, str):
+        if isinstance(raw_area, str) and raw_area in NORTH_GOA_DEFAULT_AREAS:
             selected_areas = [raw_area]
         elif isinstance(raw_area, list):
-            selected_areas = raw_area
-        else:
-            selected_areas = []
-        
-        # Фильтруем только валидные районы из нашего списка
-        valid_areas = [a for a in selected_areas if a in NORTH_GOA_DEFAULT_AREAS]
-        
-        if valid_areas:
-            filters["area__in"] = valid_areas
-            logger.info(f"Grok выбрал районы: {valid_areas}")
-        else:
-            filters.pop("area", None)
-    else:
-        # Если Grok не указал район — можно добавить дефолт по всему северу
-        filters["area__in"] = NORTH_GOA_DEFAULT_AREAS
+            selected_areas = [a for a in raw_area if a in NORTH_GOA_DEFAULT_AREAS]
 
+    # Если Grok не нашёл район — ставим весь север
+    if not selected_areas:
+        selected_areas = NORTH_GOA_DEFAULT_AREAS
+
+    filters["area__in"] = selected_areas
+    logger.info(f"Поиск по районам: {selected_areas}")
+
+    # === СОРТИРОВКА И ЛИМИТ ===
     sort = data.get("sort", "price_asc")
-    limit = data.get("limit", 20)  # Если limit от Grok null — 20 по умолчанию
+    limit = data.get("limit", 20)
+    if limit is None or limit > 30:
+        limit = 20
 
-    # Превращаем sort в order_by для Firebase
-    order_by = {
+    order_by_map = {
         "price_asc": "price_day_inr",
         "price_desc": "-price_day_inr",
         "newest": "-created_at"
-    }.get(sort, "price_day_inr")
+    }
+    order_by = order_by_map.get(sort, "price_day_inr")
 
-    # Основной поиск
-    props = get_properties(filters=filters, order_by=order_by, limit=limit)
+    # === 1. ИДЕАЛЬНЫЕ СОВПАДЕНИЯ (все фильтры) ===
+    perfect_matches = get_properties(filters=filters.copy(), order_by=order_by, limit=50)
+    seen_ids = {p["id"] for p in perfect_matches}
 
-    # Если ничего — ищем вообще всё
-    if not props:
-        props = get_properties(order_by="price_day_inr", limit=limit)
-        if props:
-            await message.answer("По твоим критериям ничего не нашёл.\nВот что есть прямо сейчас (по возрастанию цены):")
-        else:
-            await message.answer("Пока нет ни одного варианта в базе 😔\nСкоро будут!")
-            return
+    # === 2. ЧАСТИЧНЫЕ СОВПАДЕНИЯ (по одному фильтру) ===
+    partial_matches = []
+
+    # По каждому району отдельно
+    for area in selected_areas:
+        partial = get_properties(
+            filters={"area": area},
+            order_by="price_day_inr",
+            limit=8
+        )
+        for p in partial:
+            if p["id"] not in seen_ids and len(partial_matches) < 20:
+                partial_matches.append(p)
+                seen_ids.add(p["id"])
+
+    # По цене (если указана)
+    if "price_day_inr__lte" in filters:
+        partial = get_properties(
+            filters={"price_day_inr__lte": filters["price_day_inr__lte"]},
+            order_by="price_day_inr",
+            limit=8
+        )
+        for p in partial:
+            if p["id"] not in seen_ids and len(partial_matches) < 20:
+                partial_matches.append(p)
+                seen_ids.add(p["id"])
+
+    # === 3. ФИНАЛЬНЫЙ СПИСОК ===
+    final_results = perfect_matches + partial_matches
+
+    if not final_results:
+        final_results = get_properties(order_by="price_day_inr", limit=20)
+        await message.answer("По точным критериям ничего не нашёл.\n"
+                           "Показываю лучшие доступные варианты:")
     else:
-        count_text = f"Нашёл {len(props)} подходящих вариант{'ов' if len(props) > 1 else ''}"
-        if filters:
-           await message.answer(
-                f"{count_text}.\n\n"
-                "Сначала покажу самые точные по твоему запросу\n"
-                "Потом всё остальное — по убыванию релевантности\n\n"
-                "Не переживай — ничего не спрятано\n"
-                "Просто чтобы ты сразу увидел лучшее ❤️"
+        perfect_count = len(perfect_matches)
+        if perfect_count > 0:
+            await message.answer(
+                f"Нашёл {perfect_count} идеальных вариантов по всем твоим критериям!\n\n"
+                "Сначала покажу их → потом просто хорошие варианты\n"
+                "Всё честно и по делу ❤️"
             )
         else:
-            await message.answer(f"{count_text} (все доступные):")
+            await message.answer("Точных совпадений нет, но вот хорошие варианты по твоим фильтрам:")
 
-    await show_results(message, props)
+    await show_results(message, final_results[:30])
 
 
 # # === Отправка карточек с кэшированием фото ===
