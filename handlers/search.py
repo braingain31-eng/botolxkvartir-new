@@ -20,6 +20,12 @@ logger = logging.getLogger(__name__)
 router = Router()
 os.makedirs("cached_photos", exist_ok=True)
 
+# Список северных деревень по умолчанию
+NORTH_GOA_DEFAULT_AREAS = [
+    "Arambol", "Morjim", "Mandrem", "Siolim", "Kerim", "Querim",
+    "Corgao", "Korgaon", "Ashvem", "Paliem", "Agarvada"
+]
+
 
 # === Голосовой ввод ===
 @router.message(F.voice)
@@ -97,6 +103,31 @@ async def smart_search(message: Message, user_query: str):
     await thinking.delete()
 
     filters = {k: v for k, v in data.get("filters", {}).items() if v is not None}
+    user_specified_area = False
+
+    other_areas_keywords = [
+        "anjuna", "vagator", "arpora", "calangute", "baga", "candolim",
+        "sinquerim", "nerul", "reis magos", "panjim", "панаджи", "кангуте",
+        "юг", "палолем", "палolem", "агонда", "агonda", "канкона", "cavelossim"
+    ]
+
+    if "area" in data.get("filters", {}) and data["filters"]["area"]:
+        user_specified_area = True
+
+    user_query_lower = user_query.lower()
+    if any(keyword in user_query_lower for keyword in other_areas_keywords):
+        user_specified_area = True
+
+    if any(phrase in user_query_lower for phrase in ["весь гоа", "по всему гоа", "любой район", "где угодно", "не важно где"]):
+        user_specified_area = True
+
+    # === Применяем дефолтный фильтр по северу, только если пользователь НЕ указывал район ===
+    if not user_specified_area:
+        # Если в фильтрах уже есть area (например, Grok поставил null) — удаляем его
+        filters.pop("area", None)
+        # Добавляем фильтр по списку северных деревень
+        filters["area__in"] = NORTH_GOA_DEFAULT_AREAS
+
     sort = data.get("sort", "price_asc")
     limit = data.get("limit", 20)  # Если limit от Grok null — 20 по умолчанию
 

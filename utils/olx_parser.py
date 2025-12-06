@@ -21,8 +21,7 @@ BASE_URL = "https://www.olx.in/goa_g2001153/for-rent-houses-apartments_c1723"
 NORTH_GOA_AREAS = [
     "Arambol", "Arambol Beach", "Aswem", "Ashwem", "Mandrem", "Morjim",
     "Kerim", "Keri", "Korgaon", "Siolim", "Chapora", "Vagator", "Anjuna",
-    "Assagao", "Arpora", "Baga", "Calangute", "Candolim", "Nerul",
-    "Mapusa", "Agarwado", "Pilerne", "Palolem", "Agonda"
+    "Assagao", "Arpora", "Baga", "Calangute", "Candolim", "Agarwado", "Pilerne", "Palolem", "Agonda"
 ]
 
 # def normalize_location(location_text: str) -> str:
