@@ -133,7 +133,11 @@ async def smart_search(message: Message, user_query: str):
     3. Если "на месяц" или "долгосрочно" — ставь price_day_inr__lte: 2000–2500
     4. Если сказано "самые дешевые" — sort: "price_asc"
     5. Если указано количество ("5 вариантов") — ставь в limit это число
-    6. НИКОГДА не пиши пояснения — только JSON
+    6. Если пользователь говорит "до 2500", "бюджет 2000", "на месяц за 2500" — 
+        ставь price_day_inr__lte: 2500, но в коде мы сами превратим это в "от 1750 и выше".
+    7. Если говорит "от 3000" — ставь price_day_inr__gte: 3000
+    8. Не ставь одновременно gte и lte, если не уверен в диапазоне.
+    9. НИКОГДА не пиши пояснения — только JSON
     """
 
     logger.info(f"Отправляем промпт в Grok: {prompt[:500]}...")
@@ -173,6 +177,31 @@ async def smart_search(message: Message, user_query: str):
 
     filters["area__in"] = selected_areas
     logger.info(f"Поиск по районам: {selected_areas}")
+
+    # === УМНАЯ ЛОГИКА ЦЕНЫ (главное дополнение!) ===
+    price_lte = raw_filters.get("price_day_inr__lte")
+    price_gte = raw_filters.get("price_day_inr__gte")
+
+    # Если указана только верхняя граница — это БЮДЖЕТ → показываем от 70% и выше
+    if price_lte and not price_gte:
+        suggested_gte = int(price_lte * 0.7)
+        filters["price_day_inr__gte"] = suggested_gte
+        # НЕ ставим __lte — пусть будет всё дороже тоже
+        logger.info(f"Бюджет до {price_lte} → расширяем поиск от {suggested_gte} и выше")
+
+    # Если указана только нижняя граница
+    elif price_gte and not price_lte:
+        filters["price_day_inr__gte"] = price_gte
+
+    # Если диапазон — оставляем как есть
+    elif price_lte and price_gte:
+        filters["price_day_inr__gte"] = price_gte
+        filters["price_day_inr__lte"] = price_lte
+
+    # Если цена вообще не указана, но запрос про долгосрок — ставим разумный потолок
+    elif any(word in user_query.lower() for word in ["месяц", "долгосрок", "долго", "длительно"]):
+        filters["price_day_inr__lte"] = 15000
+        filters["price_day_inr__gte"] = 1000
 
     # === СОРТИРОВКА И ЛИМИТ ===
     sort = data.get("sort", "price_asc")
