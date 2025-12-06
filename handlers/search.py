@@ -99,40 +99,47 @@ async def smart_search(message: Message, user_query: str):
     
     # Формируем строку со всеми районами для промпта
     areas_list = " | ".join([f'"{area}"' for area in NORTH_GOA_DEFAULT_AREAS])
-    
+
     # Шаг 1: Формируем промпт для Grok с поддержкой количества
     prompt = f"""
-    Ты — ассистент по поиску жилья в Гоа. Пользователь хочет найти подходящие варианты.
+    Ты — ассистент по поиску жилья ТОЛЬКО в Северном Гоа.
+    Доступные районы (ОБЯЗАТЕЛЬНО выбирай только из них): {areas_str}
 
-    Пользовательский запрос: "{user_query}"
+    Пользователь написал: "{user_query}"
 
-    Проанализируй запрос и верни ТОЛЬКО JSON в следующем формате:
+    Твоя задача — вернуть ТОЛЬКО чистый JSON в формате:
 
     {{
-        "action": "search",
-        "filters": {{
-            "area": {areas_list} | null,
-            "price_day_inr__lte": 30000 | null,
-            "price_day_inr__gte": 8000 | null,
-            "bedrooms__gte": 1 | null,
-            "guests__gte": 2 | null,
-            "has_pool": true | false | null,
-            "owner_type": "private" | null
-        }},
-        "sort": "price_asc" | "price_desc" | "newest" | null,
-        "limit": 10 | null
+    "action": "search",
+    "filters": {{
+        "area": "Arambol" | "Morjim" | ["Arambol", "Morjim"] | null,
+        "price_day_inr__lte": 25000 | null,
+        "price_day_inr__gte": 8000 | null,
+        "bedrooms__gte": 1 | null,
+        "guests__gte": 2 | null,
+        "has_pool": true | false | null,
+        "owner_type": "private" | "agent" | null
+    }},
+    "sort": "price_asc" | "price_desc" | "newest" | null,
+    "limit": 10 | null
     }}
 
-    Правила:
-    - Если пользователь указал район — используй его точно
-    - Если не указал — поставь area: null (потом мы сами добавим фильтр по всему северу)
-    - Если сказано "самые дешевые", "дешево", "бюджетно" — sort: "price_asc"
-    - Если сказано "новые", "недавно добавленные" — sort: "newest"
-    - Если указано количество ("5 вариантов", "покажи 3") — поставь в limit это число
-    - Если ничего не указано — limit: null (по умолчанию покажем 10–15)
-    - Не пиши ничего кроме чистого JSON
+    ЖЁСТКИЕ ПРАВИЛА:
+    1. Поле "area" может быть:
+    - строкой: "Arambol" — если указан один район
+    - массивом: ["Arambol", "Morjim"] — если указано несколько районов
+    - null — если район не из списка выше
+    2 Поддерживай все варианты написания:
+    арамбол, арамболе, arambol, morjim, морджим, мандрем, мандрем, ашвем, вагатор, анжуна и т.д.
+    3 Если пользователь написал "арамбол и морджим", "анжуна или вагатор", "в арамболе или рядом" — верни массив из этих районов
+    4 Если пользователь сказал "любой район", "где угодно", "по всему северу" — поставь null
+    5 Если запрос про долгосрок ("на месяц", "месяц и более", "долгосрочно") — ставь price_day_inr__lte: 2000–2500
+    6 НИКОГДА не придумывай свои районы — только из списка: {areas_str}
+    7. Если сказано "самые дешевые", "дешево", "бюджетно" — sort: "price_asc"
+    8. Если сказано "новые", "недавно добавленные" — sort: "newest"
+    9. Если указано количество ("5 вариантов", "покажи 3") — поставь в limit это число
+    10. НИКОГДА не пиши пояснения — только JSON
     """
-
     logger.info(f"Отправляем промпт в Grok: {prompt[:500]}...")  # Лог запроса (первые 500 символов)
 
     grok_response = await ask_grok(prompt)
@@ -153,29 +160,28 @@ async def smart_search(message: Message, user_query: str):
     await thinking.delete()
 
     filters = {k: v for k, v in data.get("filters", {}).items() if v is not None}
-    user_specified_area = False
 
-    other_areas_keywords = [
-        "anjuna", "vagator", "arpora", "calangute", "baga", "candolim",
-        "sinquerim", "nerul", "reis magos", "panjim", "панаджи", "кангуте",
-        "юг", "палолем", "палolem", "агонда", "агonda", "канкона", "cavelossim"
-    ]
+    raw_area = data.get("filters", {}).get("area")
 
-    if "area" in data.get("filters", {}) and data["filters"]["area"]:
-        user_specified_area = True
-
-    user_query_lower = user_query.lower()
-    if any(keyword in user_query_lower for keyword in other_areas_keywords):
-        user_specified_area = True
-
-    if any(phrase in user_query_lower for phrase in ["весь гоа", "по всему гоа", "любой район", "где угодно", "не важно где"]):
-        user_specified_area = True
-
-    # === Применяем дефолтный фильтр по северу, только если пользователь НЕ указывал район ===
-    if not user_specified_area:
-        # Если в фильтрах уже есть area (например, Grok поставил null) — удаляем его
-        filters.pop("area", None)
-        # Добавляем фильтр по списку северных деревень
+    if raw_area:
+        # Приводим к единому виду: всегда список
+        if isinstance(raw_area, str):
+            selected_areas = [raw_area]
+        elif isinstance(raw_area, list):
+            selected_areas = raw_area
+        else:
+            selected_areas = []
+        
+        # Фильтруем только валидные районы из нашего списка
+        valid_areas = [a for a in selected_areas if a in NORTH_GOA_DEFAULT_AREAS]
+        
+        if valid_areas:
+            filters["area__in"] = valid_areas
+            logger.info(f"Grok выбрал районы: {valid_areas}")
+        else:
+            filters.pop("area", None)
+    else:
+        # Если Grok не указал район — можно добавить дефолт по всему северу
         filters["area__in"] = NORTH_GOA_DEFAULT_AREAS
 
     sort = data.get("sort", "price_asc")
