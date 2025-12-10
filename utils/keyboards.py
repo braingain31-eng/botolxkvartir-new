@@ -69,18 +69,18 @@ def pay_or_later_kb():
 
 def payment_menu_kb():
     kb = InlineKeyboardBuilder()
-    kb.row(
-        InlineKeyboardButton(text="Карта → 7 дней ($10)", callback_data="pay_card_7"),
-        InlineKeyboardButton(text="Карта → 30 дней ($20)", callback_data="pay_card_30")
-    )
-    kb.row(
-        InlineKeyboardButton(text="TON → 7 дней", callback_data="pay_crypto_7_ton"),
-        InlineKeyboardButton(text="TON → 30 дней", callback_data="pay_crypto_30_ton")
-    )
-    kb.row(
-        InlineKeyboardButton(text="USDT → 7 дней", callback_data="pay_crypto_7_usdt"),
-        InlineKeyboardButton(text="USDT → 30 дней", callback_data="pay_crypto_30_usdt")
-    )
+    # kb.row(
+    #     InlineKeyboardButton(text="Карта → 7 дней ($10)", callback_data="pay_card_7"),
+    #     InlineKeyboardButton(text="Карта → 30 дней ($20)", callback_data="pay_card_30")
+    # )
+    # kb.row(
+    #     InlineKeyboardButton(text="TON → 7 дней", callback_data="pay_crypto_7_ton"),
+    #     InlineKeyboardButton(text="TON → 30 дней", callback_data="pay_crypto_30_ton")
+    # )
+    # kb.row(
+    #     InlineKeyboardButton(text="USDT → 7 дней", callback_data="pay_crypto_7_usdt"),
+    #     InlineKeyboardButton(text="USDT → 30 дней", callback_data="pay_crypto_30_usdt")
+    # )
     kb.row(
         InlineKeyboardButton(text="1000 Stars → 7 дней", callback_data="pay_stars_7"),
         InlineKeyboardButton(text="2000 Stars → 30 дней", callback_data="pay_stars_30")
