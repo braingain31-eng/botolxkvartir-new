@@ -11,11 +11,11 @@ def start_kb() -> ReplyKeyboardMarkup:
         row_width=2
     )
 
-    kb.add(
+    kb.row(
         KeyboardButton("Топ-10 до $500"),
         KeyboardButton("Все варианты")
     )
-    kb.add(
+    kb.row(
         KeyboardButton("Для риэлторов"),
         KeyboardButton("Профиль")  # ← НОВАЯ КНОПКА
     )
