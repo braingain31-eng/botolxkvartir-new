@@ -4,7 +4,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from firebase_admin import firestore as fs_admin
 from google.cloud.firestore_v1 import FieldFilter
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import config
 import logging
 
@@ -185,35 +185,53 @@ def delete_all_properties() -> int:
         logger.error(f"Ошибка при удалении документов из коллекции properties: {e}")
         return 0
 
-def get_user_premium_info(user_id: int):
-    user = get_user(user_id)
-    if not user:
-        create_or_update_user(user_id, is_premium=False, premium_until=None)
-        return {"is_premium": False, "days_left": 0, "expires_at": None}
-
-    if 'is_premium' not in user or 'premium_until' not in user:
-        create_or_update_user(user_id, is_premium=False, premium_until=None)
-        return {"is_premium": False, "days_left": 0, "expires_at": None}
-
-    is_premium = user['is_premium']
-    premium_until_str = user['premium_until']
-
-    if not is_premium or not premium_until_str:
-        return {"is_premium": False, "days_left": 0, "expires_at": None}
-
+def get_user_premium_info(user_id: int) -> dict:
+    """
+    Возвращает информацию о премиуме пользователя.
+    Автоматически создаёт поля, если их нет.
+    """
     try:
-        premium_until = datetime.fromisoformat(premium_until_str.replace('Z', '+00:00'))
-        now = datetime.now(timezone.utc)
-        if now >= premium_until:
-            create_or_update_user(user_id, is_premium=False)
-            return {"is_premium": False, "days_left": 0, "expires_at": None}
+        user = get_user(user_id)
         
-        days_left = (premium_until - now).days
+        # Если пользователя нет — создаём с дефолтами
+        if not user:
+            create_or_update_user(user_id, is_premium=False, premium_until=None)
+            return {"is_premium": False, "days_left": 0, "expires_at": None}
+
+        # Если нет нужных полей — создаём
+        if 'is_premium' not in user or 'premium_until' not in user:
+            create_or_update_user(user_id, is_premium=False, premium_until=None)
+            return {"is_premium": False, "days_left": 0, "expires_at": None}
+
+        # Проверяем статус
+        if not user['is_premium'] or not user['premium_until']:
+            return {"is_premium": False, "days_left": 0, "expires_at": None}
+
+        # Парсим дату
+        premium_until_str = user['premium_until']
+        try:
+            premium_until = datetime.fromisoformat(premium_until_str.replace('Z', '+00:00'))
+        except:
+            # Если дата битая — сбрасываем
+            create_or_update_user(user_id, is_premium=False, premium_until=None)
+            return {"is_premium": False, "days_left": 0, "expires_at": None}
+
+        now = datetime.now(timezone.utc)
+
+        if now >= premium_until:
+            # Премиум истёк — сбрасываем
+            create_or_update_user(user_id, is_premium=False, premium_until=None)
+            return {"is_premium": False, "days_left": 0, "expires_at": None}
+
+        # Правильно считаем дни (даже если осталось 5 часов — будет 1 день)
+        days_left = (premium_until - now).days + 1
+
         return {
             "is_premium": True,
             "days_left": days_left,
             "expires_at": premium_until.isoformat()
         }
+
     except Exception as e:
-        logger.error(f"Ошибка премиум для {user_id}: {e}")
+        logger.error(f"Критическая ошибка в get_user_premium_info({user_id}): {e}")
         return {"is_premium": False, "days_left": 0, "expires_at": None}

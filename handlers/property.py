@@ -1,7 +1,7 @@
 # handlers/property.py
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
-from database.firebase_db import get_property_by_id  # ← функция, которую надо создать
+from database.firebase_db import get_property_by_id, get_user_premium_info
 import logging
 from aiogram.exceptions import TelegramBadRequest
 from utils.keyboards import payment_menu_kb  
@@ -77,32 +77,35 @@ async def back_to_search(call: CallbackQuery):
 async def contact_handler(call: CallbackQuery):
     user_id = call.from_user.id
 
-    if not is_user_premium(user_id):
-        # Пользователь НЕ премиум → показываем меню оплаты
-        kb = payment_menu_kb()  # ← ТВОЁ КРАСИВОЕ МЕНЮ ИЗ keyboards.py
-        
-        await call.answer("Контакты хозяев — только для премиум-пользователей", show_alert=True)
+    # Используем полную инфу о премиуме
+    premium_info = get_user_premium_info(user_id)
+
+    if not premium_info["is_premium"]:
+        # НЕ премиум — показываем красивое меню оплаты
+        kb = payment_menu_kb()
+
+        await call.answer("Контакты доступны только премиум-пользователям", show_alert=True)
         await call.message.answer(
-            "Чтобы увидеть контакты — выбери подписку:",
+            "Чтобы увидеть контакты хозяина — выбери подписку:\n"
+            "Ты уже близко к лучшим вариантам",
             reply_markup=kb
         )
         return
 
-    # Пользователь премиум → показываем контакты
-    prop_id = call.data.split("_", 1)[1]  # надёжнее, чем split("_")[1]
+    # Пользователь премиум — показываем контакты
+    prop_id = call.data.split("_", 1)[1]
     prop = get_property_by_id(prop_id)
 
     if not prop:
-        await call.answer("Объект не найден или удалён", show_alert=True)
+        await call.answer("Объект удалён или недоступен", show_alert=True)
         return
 
-    # Берём контакты (если нет — пишем, что скрыты)
-    contacts = prop.get("contacts", "Контакты скрыты владельцем")
-    owner_name = prop.get("owner_name", "Владелец")
+    # Формируем красивое сообщение с контактами
+    owner_name = prop.get("owner_name", "Владелец").strip()
+    contacts = prop.get("contacts", "Контакты скрыты").strip()
 
-    # Формируем красивое сообщение
     text = f"""
-Контакты владельца:
+<b>Контакты владельца:</b>
 
 {owner_name}
 {contacts}
@@ -110,7 +113,7 @@ async def contact_handler(call: CallbackQuery):
 Напиши ему напрямую — торгуйся смело!
     """.strip()
 
-    # Кнопка "Назад" — возвращаем в карточку объявления
+    # Кнопка "Назад" — возвращаемся к карточке объявления
     kb = InlineKeyboardBuilder()
     kb.button(text="Назад к объявлению", callback_data=f"prop_{prop_id}")
 

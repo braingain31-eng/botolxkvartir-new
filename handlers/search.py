@@ -3,7 +3,7 @@
 from aiogram import Router, F
 from aiogram.types import Message, FSInputFile, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from database.firebase_db import get_properties
+from database.firebase_db import get_properties, get_user_premium_info
 from utils.grok_api import ask_grok
 from utils.voice_handler import download_voice
 from utils.voice_to_text import voice_to_text
@@ -32,8 +32,10 @@ NORTH_GOA_DEFAULT_AREAS = [
 @router.message(F.voice)
 async def voice_search(message: Message):
     user_id = message.from_user.id
-    
-    if not is_user_premium(user_id):
+
+    premium_info = get_user_premium_info(user_id)
+
+    if not premium_info["is_premium"]:
             # Красивое меню оплаты вместо простого текста
             kb = payment_menu_kb()
 
@@ -43,6 +45,8 @@ async def voice_search(message: Message):
                 "Выбери подписку и говори — я пойму всё:",
                 reply_markup=kb
             )
+            return
+
     thinking = await message.answer("Распознаю голос...")
     file_path = await download_voice(message)
     if not file_path:
