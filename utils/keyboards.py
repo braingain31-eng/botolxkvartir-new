@@ -2,25 +2,15 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 
 def start_kb() -> ReplyKeyboardMarkup:
-    """
-    Главное меню — всегда видно рядом с полем ввода
-    """
-    kb = ReplyKeyboardMarkup(
+    keyboard = [
+        [KeyboardButton(text="Топ-10 до $500"), KeyboardButton(text="Все варианты")],
+        [KeyboardButton(text="Для риэлторов"), KeyboardButton(text="Профиль")]
+    ]
+    return ReplyKeyboardMarkup(
+        keyboard=keyboard,        # ← ОБЯЗАТЕЛЬНО!
         resize_keyboard=True,
-        one_time_keyboard=False,
-        row_width=2
+        one_time_keyboard=False
     )
-
-    kb.row(
-        KeyboardButton("Топ-10 до $500"),
-        KeyboardButton("Все варианты")
-    )
-    kb.row(
-        KeyboardButton("Для риэлторов"),
-        KeyboardButton("Профиль")  # ← НОВАЯ КНОПКА
-    )
-
-    return kb
 
 
 # === 2. Быстрые фильтры (самые популярные запросы в Гоа) ===
