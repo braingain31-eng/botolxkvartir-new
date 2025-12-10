@@ -61,7 +61,7 @@ async def show_profile_menu(message: Message):
 
     if info["is_premium"]:
         text = f"""
-<b>Привет, {name}!</b>
+Привет, <b>{name}</b>!
 
 Твой статус: <b>Премиум активен</b>
 Осталось: <b>{info['days_left']} дн.</b>
@@ -71,24 +71,22 @@ async def show_profile_menu(message: Message):
         """
         kb = InlineKeyboardBuilder()
         kb.button(text="Назад в меню", callback_data="back_to_main")
+        reply_markup = kb.as_markup()  # ← Здесь можно, потому что kb — Builder
     else:
         text = f"""
-<b>Привет, {name}!</b>
+Привет, <b>{name}</b>!
 
 Сейчас ты на стандартной версии
 
-Хочешь:
-• Контакты хозяев
-• Приоритет в поиске
-• Новые объекты первым
+Хочешь контакты хозяев и приоритет в поиске?
 
 Выбери удобный способ оплаты:
         """
-        kb = payment_menu_kb()  # ← ВОТ ТВОЁ ГОТОВОЕ МЕНЮ!
+        reply_markup = payment_menu_kb()  # ← Прямо функция, без .as_markup()
 
     await message.answer(
         text.strip(),
-        reply_markup=kb.as_markup(),
+        reply_markup=reply_markup,
         disable_web_page_preview=True
     )
 

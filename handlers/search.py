@@ -32,7 +32,7 @@ NORTH_GOA_DEFAULT_AREAS = [
 @router.message(F.voice)
 async def voice_search(message: Message):
     user_id = message.from_user.id
-
+    
     if not is_user_premium(user_id):
             # Красивое меню оплаты вместо простого текста
             kb = payment_menu_kb()
@@ -43,7 +43,6 @@ async def voice_search(message: Message):
                 "Выбери подписку и говори — я пойму всё:",
                 reply_markup=kb
             )
-            
     thinking = await message.answer("Распознаю голос...")
     file_path = await download_voice(message)
     if not file_path:
