@@ -4,6 +4,7 @@ from aiogram.types import CallbackQuery
 from database.firebase_db import get_property_by_id  # ← функция, которую надо создать
 import logging
 from aiogram.exceptions import TelegramBadRequest
+from utils.keyboards import payment_menu_kb  
 
 router = Router()
 
@@ -70,4 +71,52 @@ async def show_property_details(call: CallbackQuery):
 @router.callback_query(F.data == "back_to_search")
 async def back_to_search(call: CallbackQuery):
     await call.message.delete()  # или edit на предыдущее сообщение
+    await call.answer()
+
+@router.callback_query(F.data.startswith("contact_"))
+async def contact_handler(call: CallbackQuery):
+    user_id = call.from_user.id
+
+    if not is_user_premium(user_id):
+        # Пользователь НЕ премиум → показываем меню оплаты
+        kb = payment_menu_kb()  # ← ТВОЁ КРАСИВОЕ МЕНЮ ИЗ keyboards.py
+        
+        await call.answer("Контакты хозяев — только для премиум-пользователей", show_alert=True)
+        await call.message.answer(
+            "Чтобы увидеть контакты — выбери подписку:",
+            reply_markup=kb
+        )
+        return
+
+    # Пользователь премиум → показываем контакты
+    prop_id = call.data.split("_", 1)[1]  # надёжнее, чем split("_")[1]
+    prop = get_property_by_id(prop_id)
+
+    if not prop:
+        await call.answer("Объект не найден или удалён", show_alert=True)
+        return
+
+    # Берём контакты (если нет — пишем, что скрыты)
+    contacts = prop.get("contacts", "Контакты скрыты владельцем")
+    owner_name = prop.get("owner_name", "Владелец")
+
+    # Формируем красивое сообщение
+    text = f"""
+Контакты владельца:
+
+{owner_name}
+{contacts}
+
+Напиши ему напрямую — торгуйся смело!
+    """.strip()
+
+    # Кнопка "Назад" — возвращаем в карточку объявления
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Назад к объявлению", callback_data=f"prop_{prop_id}")
+
+    await call.message.edit_text(
+        text,
+        reply_markup=kb.as_markup(),
+        disable_web_page_preview=True
+    )
     await call.answer()

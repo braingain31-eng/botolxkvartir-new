@@ -7,6 +7,7 @@ from database.firebase_db import get_properties
 from utils.grok_api import ask_grok
 from utils.voice_handler import download_voice
 from utils.voice_to_text import voice_to_text
+from utils.keyboards import payment_menu_kb 
 import os
 import aiohttp
 import aiofiles
@@ -30,6 +31,19 @@ NORTH_GOA_DEFAULT_AREAS = [
 # === Голосовой ввод ===
 @router.message(F.voice)
 async def voice_search(message: Message):
+    user_id = message.from_user.id
+
+    if not is_user_premium(user_id):
+            # Красивое меню оплаты вместо простого текста
+            kb = payment_menu_kb()
+
+            await message.answer(
+                "Голосовой поиск — это магия\n"
+                "Но она доступна только премиум-пользователям\n\n"
+                "Выбери подписку и говори — я пойму всё:",
+                reply_markup=kb
+            )
+            
     thinking = await message.answer("Распознаю голос...")
     file_path = await download_voice(message)
     if not file_path:

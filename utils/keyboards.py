@@ -3,20 +3,24 @@ from aiogram.types import InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardBut
 
 def start_kb() -> ReplyKeyboardMarkup:
     """
-    Главное меню — всегда видно рядом с полем ввода (aiogram 3.x)
+    Главное меню — всегда видно рядом с полем ввода
     """
-    buttons = [
-        [KeyboardButton(text="Голосом"), KeyboardButton(text="Текстом")],
-        [KeyboardButton(text="Топ-10 до $500"), KeyboardButton(text="Все варианты")],
-        [KeyboardButton(text="Для риэлторов")]
-    ]
-
-    return ReplyKeyboardMarkup(
-        keyboard=buttons,           # ← ОБЯЗАТЕЛЬНО передаём список рядов
+    kb = ReplyKeyboardMarkup(
         resize_keyboard=True,
-        one_time_keyboard=False,    # не исчезает после нажатия
+        one_time_keyboard=False,
         row_width=2
     )
+
+    kb.add(
+        KeyboardButton("Топ-10 до $500"),
+        KeyboardButton("Все варианты")
+    )
+    kb.add(
+        KeyboardButton("Для риэлторов"),
+        KeyboardButton("Профиль")  # ← НОВАЯ КНОПКА
+    )
+
+    return kb
 
 
 # === 2. Быстрые фильтры (самые популярные запросы в Гоа) ===

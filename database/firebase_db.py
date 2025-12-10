@@ -184,3 +184,36 @@ def delete_all_properties() -> int:
     except Exception as e:
         logger.error(f"Ошибка при удалении документов из коллекции properties: {e}")
         return 0
+
+def get_user_premium_info(user_id: int):
+    user = get_user(user_id)
+    if not user:
+        create_or_update_user(user_id, is_premium=False, premium_until=None)
+        return {"is_premium": False, "days_left": 0, "expires_at": None}
+
+    if 'is_premium' not in user or 'premium_until' not in user:
+        create_or_update_user(user_id, is_premium=False, premium_until=None)
+        return {"is_premium": False, "days_left": 0, "expires_at": None}
+
+    is_premium = user['is_premium']
+    premium_until_str = user['premium_until']
+
+    if not is_premium or not premium_until_str:
+        return {"is_premium": False, "days_left": 0, "expires_at": None}
+
+    try:
+        premium_until = datetime.fromisoformat(premium_until_str.replace('Z', '+00:00'))
+        now = datetime.now(timezone.utc)
+        if now >= premium_until:
+            create_or_update_user(user_id, is_premium=False)
+            return {"is_premium": False, "days_left": 0, "expires_at": None}
+        
+        days_left = (premium_until - now).days
+        return {
+            "is_premium": True,
+            "days_left": days_left,
+            "expires_at": premium_until.isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Ошибка премиум для {user_id}: {e}")
+        return {"is_premium": False, "days_left": 0, "expires_at": None}

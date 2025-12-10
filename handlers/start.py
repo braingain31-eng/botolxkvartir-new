@@ -2,7 +2,7 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from utils.keyboards import start_kb                     # ← ИСПРАВЛЕНО: убрал main_menu_kb
+from utils.keyboards import start_kb, payment_menu_kb                     # ← ИСПРАВЛЕНО: убрал main_menu_kb
 # from database.models import SessionLocal, User
 from datetime import datetime
 from database.firebase_db import create_or_update_user
@@ -52,6 +52,54 @@ async def start(message: Message):
     create_or_update_user(user_id, user_type="client")
     await message.answer(WELCOME_TEXT, reply_markup=start_kb(), disable_web_page_preview=True)
 
+
+@router.message(F.text == "Профиль")
+async def show_profile_menu(message: Message):
+    user_id = message.from_user.id
+    name = message.from_user.full_name or "Гость"
+    info = get_user_premium_info(user_id)
+
+    if info["is_premium"]:
+        text = f"""
+<b>Привет, {name}!</b>
+
+Твой статус: <b>Премиум активен</b>
+Осталось: <b>{info['days_left']} дн.</b>
+Истекает: <code>{info['expires_at'][:10]}</code>
+
+Ты уже в элите
+        """
+        kb = InlineKeyboardBuilder()
+        kb.button(text="Назад в меню", callback_data="back_to_main")
+    else:
+        text = f"""
+<b>Привет, {name}!</b>
+
+Сейчас ты на стандартной версии
+
+Хочешь:
+• Контакты хозяев
+• Приоритет в поиске
+• Новые объекты первым
+
+Выбери удобный способ оплаты:
+        """
+        kb = payment_menu_kb()  # ← ВОТ ТВОЁ ГОТОВОЕ МЕНЮ!
+
+    await message.answer(
+        text.strip(),
+        reply_markup=kb.as_markup(),
+        disable_web_page_preview=True
+    )
+
+# Возврат в главное меню
+@router.callback_query(F.data == "back_to_main")
+async def back_to_main(call: CallbackQuery):
+    await call.message.edit_text(
+        "Главное меню:",
+        reply_markup=start_kb()
+    )
+    await call.answer()
 
 @router.callback_query(F.data.in_(["pay_7", "pay_30"]))
 async def show_payment_options(call: CallbackQuery):
