@@ -14,7 +14,7 @@ from aiogram.fsm.state import StatesGroup, State
 from datetime import datetime, timedelta
 
 import config
-from database.firebase_db import get_user, create_or_update_user, update_paid_until
+from database.firebase_db import get_user, create_or_update_user, activate_premium
 from utils.keyboards import payment_menu_kb
 
 router = Router()
@@ -143,7 +143,7 @@ async def successful_payment(message: Message):
     method = parts[2] if len(parts) > 2 else "unknown"
 
     # Активируем премиум в Firebase
-    update_paid_until(user_id, days)
+    activate_premium(user_id, days, reason="stars")
 
     method_names = {
         "card": "картой (Stripe)",

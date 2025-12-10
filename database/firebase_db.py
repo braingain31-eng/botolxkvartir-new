@@ -37,6 +37,39 @@ def update_paid_until(user_id: int, days: int):
     paid_until = (datetime.utcnow() + timedelta(days=days)).isoformat()
     create_or_update_user(user_id, paid_until=paid_until)
 
+def activate_premium(user_id: int, days: int = 30, reason: str = "manual"):
+    """
+    Активирует премиум-подписку для пользователя.
+    
+    Args:
+        user_id: Telegram ID пользователя
+        days: Количество дней подписки (7, 30 и т.д.)
+        reason: Причина активации (для логов): "stars", "crypto", "card", "bonus", "manual"
+    """
+    try:
+        # Точная дата окончания — UTC
+        now = datetime.now(timezone.utc)
+        paid_until = now + timedelta(days=days)
+
+        # Обновляем пользователя в Firestore
+        update_data = {
+            "is_premium": True,
+            "premium_until": paid_until.isoformat(),
+            "premium_activated_at": now.isoformat(),
+            "premium_source": reason,
+            "premium_days_added": days,
+        }
+
+        create_or_update_user(user_id, **update_data)
+
+        days_word = "день" if days == 1 else "дня" if 2 <= days <= 4 else "дней"
+        logger.info(f"Премиум активирован: user_id={user_id}, +{days} {days_word}, до {paid_until.date()} (по {reason})")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Ошибка активации премиума для {user_id}: {e}")
+        return False
 
 # === PROPERTIES — ГЛАВНАЯ ФУНКЦИЯ С ПОДДЕРЖКОЙ order_by ===
 def get_properties(
@@ -200,7 +233,12 @@ def get_user_premium_info(user_id: int) -> dict:
 
         # Если нет нужных полей — создаём
         if 'is_premium' not in user or 'premium_until' not in user:
-            create_or_update_user(user_id, is_premium=False, premium_until=None)
+            create_or_update_user(
+                user_id, 
+                is_premium=False, 
+                premium_until=None,
+                premium_source="expired"
+            )
             return {"is_premium": False, "days_left": 0, "expires_at": None}
 
         # Проверяем статус
