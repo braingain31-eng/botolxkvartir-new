@@ -5,7 +5,7 @@ from aiogram.fsm.state import StatesGroup, State
 from utils.keyboards import start_kb, payment_menu_kb, main_menu_inline                     # ← ИСПРАВЛЕНО: убрал main_menu_kb
 # from database.models import SessionLocal, User
 from datetime import datetime
-from database.firebase_db import create_or_update_user, get_user_premium_info
+from database.firebase_db import create_or_update_user, get_user_premium_info, get_user
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 router = Router()
