@@ -1,6 +1,7 @@
 # handlers/property.py
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from database.firebase_db import get_property_by_id, get_user_premium_info, is_favorite, add_favorite, remove_favorite
 import logging
 from aiogram.exceptions import TelegramBadRequest
