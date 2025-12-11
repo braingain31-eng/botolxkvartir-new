@@ -6,6 +6,9 @@ from database.firebase_db import get_property_by_id, get_user_premium_info, is_f
 import logging
 from aiogram.exceptions import TelegramBadRequest
 from utils.keyboards import payment_menu_kb  
+from handlers.start import show_profile_menu
+from handlers.search import smart_search
+
 
 router = Router()
 
@@ -71,8 +74,25 @@ async def show_property_details(call: CallbackQuery):
 
     kb.button(text="Назад", callback_data="back")
 
-    await call.message.edit_text(text, reply_markup=kb.as_markup())
-    await call.answer()
+    try:
+        if call.message.photo or call.message.video:
+            await call.message.edit_caption(
+                caption=text,
+                reply_markup=kb.as_markup()
+            )
+        else:
+            await call.message.edit_text(
+                text,
+                reply_markup=kb.as_markup(),
+                disable_web_page_preview=True
+            )
+    except TelegramBadRequest:
+        # На всякий случай — отправляем новое сообщение
+        await call.message.answer(
+            text,
+            reply_markup=kb.as_markup(),
+            disable_web_page_preview=True
+        )
 
 # Обработчик для избранного
 @router.callback_query(F.data.startswith("add_fav_"))
