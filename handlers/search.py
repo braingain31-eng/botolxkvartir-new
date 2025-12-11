@@ -410,4 +410,4 @@ async def send_cached_photo(message, photo_url: str, caption: str, reply_markup=
     except:
         pass
 
-    await message.answer(f"{caption}\n\nФото: {photo_url}", reply_markup=reply_markup, disable_web_page_preview=False)
+    await message.answer(f"{caption}\n\nФото: нет фото", reply_markup=reply_markup, disable_web_page_preview=False)
