@@ -1,7 +1,7 @@
 # handlers/property.py
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
-from database.firebase_db import get_property_by_id, get_user_premium_info
+from database.firebase_db import get_property_by_id, get_user_premium_info, is_favorite, add_favorite, remove_favorite
 import logging
 from aiogram.exceptions import TelegramBadRequest
 from utils.keyboards import payment_menu_kb  
@@ -41,32 +41,52 @@ async def show_property_details(call: CallbackQuery):
         await call.answer("Объявление удалено или недоступно", show_alert=True)
         return
 
+    premium_info = get_user_premium_info(call.from_user.id)
+    is_premium = premium_info["is_premium"]
+    url = prop['olx_url'] if is_premium else "Купить премиум, чтобы увидеть ссылку"
+
     text = f"""
 <b>{prop['title']}</b>
 
 {prop['area']} • ₹{prop['price_day_inr']}/день
 Источник: OLX.in
 
-{prop['olx_url']}
+{url}
     """.strip()
 
-    # Кнопка "Назад" — возвращает в поиск (опционально)
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    # Клавиатура
     kb = InlineKeyboardBuilder()
-    kb.button(text="Назад", callback_data="back_to_search")
-    kb.button(text="Открыть в OLX", url=prop['olx_url'])
-
-    if prop.get('photos') and len(prop['photos']) > 1:
-        # Если много фото — можно сделать галерею, но пока просто первое
-        await call.message.edit_media(
-            media=prop['photos'][0],
-            reply_markup=kb.as_markup()
-        )
-        await call.message.edit_caption(caption=text, reply_markup=kb.as_markup())
+    
+    if is_premium:
+        kb.button(text="Открыть в OLX", url=prop['olx_url'])
     else:
-        await call.message.edit_caption(caption=text, reply_markup=kb.as_markup())
+        kb.button(text="Купить премиум", callback_data="pay_premium")
 
+    # Проверяем, в избранном ли объект
+    is_fav = is_favorite(call.from_user.id, prop_id)
+    fav_text = "Убрать из избранного" if is_fav else "Сохранить в избранное"
+    fav_data = f"remove_fav_{prop_id}" if is_fav else f"add_fav_{prop_id}"
+    kb.button(text=fav_text, callback_data=fav_data)
+
+    kb.button(text="Назад", callback_data="back")
+
+    await call.message.edit_text(text, reply_markup=kb.as_markup())
     await call.answer()
+
+# Обработчик для избранного
+@router.callback_query(F.data.startswith("add_fav_"))
+async def add_to_favorites(call: CallbackQuery):
+    prop_id = call.data.split("_")[2]
+    add_favorite(call.from_user.id, prop_id)
+    await call.answer("Добавлено в избранное!", show_alert=True)
+    await show_property_details(call)  # Обновляем клавиатуру (теперь "Убрать")
+
+@router.callback_query(F.data.startswith("remove_fav_"))
+async def remove_from_favorites(call: CallbackQuery):
+    prop_id = call.data.split("_")[2]
+    remove_favorite(call.from_user.id, prop_id)
+    await call.answer("Убрано из избранного!", show_alert=True)
+    await show_property_details(call)  # Обновляем клавиатуру (теперь "Сохранить")
 
 @router.callback_query(F.data == "back_to_search")
 async def back_to_search(call: CallbackQuery):

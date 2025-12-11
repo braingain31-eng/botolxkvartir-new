@@ -123,3 +123,36 @@ def back_kb(callback_data: str = "back"):
     kb = InlineKeyboardBuilder()
     kb.button(text="Назад", callback_data=callback_data)
     return kb.as_markup()
+
+def main_menu_inline() -> InlineKeyboardMarkup:
+    """Красивое меню под каждым сообщением (как обычная клавиатура)"""
+    kb = InlineKeyboardBuilder()
+    kb.row(
+        InlineKeyboardButton(text="Топ-10 до $500", callback_data="top10"),
+        InlineKeyboardButton(text="Все варианты", callback_data="all_props")
+    )
+    kb.row(
+        InlineKeyboardButton(text="Для риэлторов", callback_data="agent_menu"),
+        InlineKeyboardButton(text="Профиль", callback_data="profile")
+    )
+    return kb.as_markup()
+
+@router.callback_query(F.data == "top10")
+async def cmd_top10(call: CallbackQuery):
+    await smart_search(call.message, "топ-10 до $500")
+    await call.answer()
+
+@router.callback_query(F.data == "all_props")
+async def cmd_all(call: CallbackQuery):
+    await smart_search(call.message, "все варианты")
+    await call.answer()
+
+@router.callback_query(F.data == "agent_menu")
+async def cmd_agent(call: CallbackQuery):
+    await call.message.answer("Риэлторское меню:", reply_markup=agent_menu_kb())
+    await call.answer()
+
+@router.callback_query(F.data == "profile")
+async def cmd_profile(call: CallbackQuery):
+    await show_profile_menu(call.message)
+    await call.answer()

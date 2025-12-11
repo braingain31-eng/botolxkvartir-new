@@ -273,3 +273,23 @@ def get_user_premium_info(user_id: int) -> dict:
     except Exception as e:
         logger.error(f"Критическая ошибка в get_user_premium_info({user_id}): {e}")
         return {"is_premium": False, "days_left": 0, "expires_at": None}
+
+def add_favorite(user_id: int, prop_id: str):
+    doc_ref = db.collection('users').document(str(user_id))
+    doc_ref.update({
+        "favorites": firestore.ArrayUnion([prop_id])
+    })
+    logger.info(f"Добавлено в избранное: user {user_id}, prop {prop_id}")
+
+def remove_favorite(user_id: int, prop_id: str):
+    doc_ref = db.collection('users').document(str(user_id))
+    doc_ref.update({
+        "favorites": firestore.ArrayRemove([prop_id])
+    })
+    logger.info(f"Убрано из избранного: user {user_id}, prop {prop_id}")
+
+def is_favorite(user_id: int, prop_id: str) -> bool:
+    user = get_user(user_id)
+    if not user or not user.get("favorites"):
+        return False
+    return prop_id in user["favorites"]

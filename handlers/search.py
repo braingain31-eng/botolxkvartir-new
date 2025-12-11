@@ -118,59 +118,71 @@ async def smart_search(message: Message, user_query: str):
     areas_str = ", ".join(NORTH_GOA_DEFAULT_AREAS)
     areas_list = " | ".join([f'"{area}"' for area in NORTH_GOA_DEFAULT_AREAS])
 
-    prompt = f"""
-    Ты — ассистент по поиску жилья ТОЛЬКО в Северном Гоа.
-    Доступные районы (ОБЯЗАТЕЛЬНО выбирай только из них): {areas_str}
-
-    Пользователь написал: "{user_query}"
-
-    Твоя задача — вернуть ТОЛЬКО чистый JSON в формате:
-
-    {{
-    "action": "search",
-    "filters": {{
-        "area": "Arambol" | "Morjim" | ["Arambol", "Morjim"] | null,
-        "price_day_inr__lte": 25000 | null,
-        "price_day_inr__gte": 8000 | null,
-        "bedrooms__gte": 1 | null,
-        "guests__gte": 2 | null,
-        "has_pool": true | false | null,
-        "owner_type": "private" | "agent" | null
-    }},
-    "sort": "price_asc" | "price_desc" | "newest" | null,
-    "limit": 10 | null
-    }}
-
-    ЖЁСТКИЕ ПРАВИЛА:
-    1. Поле "area" может быть:
-       - строкой: "Arambol" — если один район
-       - массивом: ["Arambol", "Morjim"] — если несколько
-       - null — если район не из списка
-    2. Поддерживай все варианты: арамбол, арамболе, arambol, morjim, морджим и т.д.
-    3. Если "на месяц" или "долгосрочно" — ставь price_day_inr__lte: 2000–2500
-    4. Если сказано "самые дешевые" — sort: "price_asc"
-    5. Если указано количество ("5 вариантов") — ставь в limit это число
-    6. Если пользователь говорит "до 2500", "бюджет 2000", "на месяц за 2500" — 
-        ставь price_day_inr__lte: 2500, но в коде мы сами превратим это в "от 1750 и выше".
-    7. Если говорит "от 3000" — ставь price_day_inr__gte: 3000
-    8. Не ставь одновременно gte и lte, если не уверен в диапазоне.
-    9. НИКОГДА не пиши пояснения — только JSON
-    """
-
-    logger.info(f"Отправляем промпт в Grok: {prompt[:500]}...")
-    grok_response = await ask_grok(prompt)
-    logger.info(f"Получен ответ от Grok: {grok_response[:900]}...")
-
-    # Парсинг JSON
-    json_str = grok_response.strip()
-    json_str = re.sub(r"^```json\s*", "", json_str, flags=re.IGNORECASE)
-    json_str = re.sub(r"```$", "", json_str).strip()
-
-    try:
-        data = json.loads(json_str)
-    except Exception as e:
-        logger.warning(f"Grok вернул битый JSON: {e}. Используем дефолт.")
+# Проверяем стандартные фразы перед Grok
+    user_query_lower = user_query.lower()
+    if user_query_lower == "топ-10 до $500":
+        data = {"action": "search", "filters": {"price_day_inr__lte": 41500}, "sort": "price_asc", "limit": 10}
+        logger.info("Стандартный запрос: Топ-10 до $500 → пропускаем Grok")
+    elif user_query_lower == "все варианты":
         data = {"action": "search", "filters": {}, "sort": "price_asc", "limit": None}
+        logger.info("Стандартный запрос: Все варианты → пропускаем Grok")
+    else:
+        # Шаг 1: Формируем промпт для Grok с поддержкой количества
+        prompt = f"""
+        Ты — ассистент по поиску жилья ТОЛЬКО в Северном Гоа.
+        Доступные районы (ОБЯЗАТЕЛЬНО выбирай только из них): {areas_str}
+
+        Пользователь написал: "{user_query}"
+
+        Твоя задача — вернуть ТОЛЬКО чистый JSON в формате:
+
+        {{
+        "action": "search",
+        "filters": {{
+            "area": "Arambol" | "Morjim" | ["Arambol", "Morjim"] | null,
+            "price_day_inr__lte": 25000 | null,
+            "price_day_inr__gte": 8000 | null,
+            "bedrooms__gte": 1 | null,
+            "guests__gte": 2 | null,
+            "has_pool": true | false | null,
+            "owner_type": "private" | "agent" | null
+        }},
+        "sort": "price_asc" | "price_desc" | "newest" | null,
+        "limit": 10 | null
+        }}
+
+        ЖЁСТКИЕ ПРАВИЛА:
+        1. Поле "area" может быть:
+           - строкой: "Arambol" — если один район
+           - массивом: ["Arambol", "Morjim"] — если несколько
+           - null — если район не из списка
+        2. Поддерживай все варианты: арамбол, арамболе, arambol, morjim, морджим и т.д.
+        3. Если "на месяц" или "долгосрочно" — ставь price_day_inr__lte: 2000–2500
+        4. Если сказано "самые дешевые" — sort: "price_asc"
+        5. Если указано количество ("5 вариантов") — ставь в limit это число
+        6. Если пользователь говорит "до 2500", "бюджет 2000", "на месяц за 2500" — 
+            ставь price_day_inr__lte: 2500, но в коде мы сами превратим это в "от 1750 и выше".
+        7. Если говорит "от 3000" — ставь price_day_inr__gte: 3000
+        8. Не ставь одновременно gte и lte, если не уверен в диапазоне.
+        9. НИКОГДА не пиши пояснения — только JSON
+        """
+
+        logger.info(f"Отправляем промпт в Grok: {prompt[:500]}...")  # Лог запроса (первые 500 символов)
+
+        grok_response = await ask_grok(prompt)
+
+        logger.info(f"Получен ответ от Grok: {grok_response[:900]}...")  # Лог ответа (первые 500 символов)
+
+        # Шаг 2: Парсинг JSON
+        json_str = grok_response.strip()
+        json_str = re.sub(r"^```json\s*", "", json_str, flags=re.IGNORECASE)
+        json_str = re.sub(r"```$", "", json_str).strip()
+
+        try:
+            data = json.loads(json_str)
+        except Exception as e:
+            logger.warning(f"Grok вернул невалидный JSON, используем дефолт. Ошибка: {e}\nОтвет был: {grok_response[:300]}")
+            data = {"action": "search", "filters": {}, "sort": "price_asc", "limit": null}
 
     await thinking.delete()
 

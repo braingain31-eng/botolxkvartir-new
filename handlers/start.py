@@ -2,7 +2,7 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from utils.keyboards import start_kb, payment_menu_kb                     # ← ИСПРАВЛЕНО: убрал main_menu_kb
+from utils.keyboards import start_kb, payment_menu_kb, main_menu_inline                     # ← ИСПРАВЛЕНО: убрал main_menu_kb
 # from database.models import SessionLocal, User
 from datetime import datetime
 from database.firebase_db import create_or_update_user, get_user_premium_info
@@ -32,8 +32,8 @@ WELCOME_TEXT = """
    - Уведомления о новых вариантах мгновенно  
    - Всегда знаешь актуальные цены (чтобы риэлтор не наёб… не обманул тебя по цене)
 
-5. Ничего не упустишь  
-   Пока ты спишь — мы следим за свежими объявлениями и пингуем тебя первыми
+5. Бот постоянно повторяет поиск по всем базам и пришлёт тебе новую квартиру 
+   в самому первому это идеально если ты клиент А ещё лучше если ты риэлтор
 
 Просто напиши голосом или текстом, что ищешь — остальное сделаем мы  
 t.me/GoaNestBot
@@ -50,8 +50,54 @@ def get_prices_in_stars():
 async def start(message: Message):
     user_id = message.from_user.id
     create_or_update_user(user_id, user_type="client")
-    await message.answer(WELCOME_TEXT, reply_markup=start_kb(), disable_web_page_preview=True)
 
+    # Одно красивое сообщение + inline-меню под ним
+    await message.answer(
+        WELCOME_TEXT + "\n\nВыбери, что хочешь:",
+        reply_markup=main_menu_inline(),  # ← главное меню под сообщением
+        disable_web_page_preview=True
+    )
+
+    # А постоянное меню внизу (start_kb) — оно и так остаётся от предыдущих запусков
+    # Если его нет — можно принудительно показать:
+    await message.answer("Главное меню всегда здесь:", reply_markup=start_kb())
+
+# @router.message(F.text == "Профиль")
+# async def show_profile_menu(message: Message):
+#     user_id = message.from_user.id
+#     name = message.from_user.full_name or "Гость"
+#     info = get_user_premium_info(user_id)
+
+#     if info["is_premium"]:
+#         text = f"""
+# Привет, <b>{name}</b>!
+
+# Твой статус: <b>Премиум активен</b>
+# Осталось: <b>{info['days_left']} дн.</b>
+# Истекает: <code>{info['expires_at'][:10]}</code>
+
+# Ты уже в элите
+#         """
+#         kb = InlineKeyboardBuilder()
+#         kb.button(text="Назад в меню", callback_data="back_to_main")
+#         reply_markup = kb.as_markup()  # ← Здесь можно, потому что kb — Builder
+#     else:
+#         text = f"""
+# Привет, <b>{name}</b>!
+
+# Сейчас ты на стандартной версии
+
+# Хочешь контакты хозяев и приоритет в поиске?
+
+# Выбери удобный способ оплаты:
+#         """
+#         reply_markup = payment_menu_kb()  # ← Прямо функция, без .as_markup()
+
+#     await message.answer(
+#         text.strip(),
+#         reply_markup=reply_markup,
+#         disable_web_page_preview=True
+#     )
 
 @router.message(F.text == "Профиль")
 async def show_profile_menu(message: Message):
@@ -59,36 +105,81 @@ async def show_profile_menu(message: Message):
     name = message.from_user.full_name or "Гость"
     info = get_user_premium_info(user_id)
 
-    if info["is_premium"]:
-        text = f"""
-Привет, <b>{name}</b>!
+    # === Получаем избранное (работает для всех!) ===
+    user = get_user(user_id)
+    favorite_ids = user.get("favorites", []) if user else []
 
-Твой статус: <b>Премиум активен</b>
+    # === Статус премиума ===
+    if info["is_premium"]:
+        premium_text = f"""
+<b>Премиум активен</b>
 Осталось: <b>{info['days_left']} дн.</b>
 Истекает: <code>{info['expires_at'][:10]}</code>
 
 Ты уже в элите
         """
-        kb = InlineKeyboardBuilder()
-        kb.button(text="Назад в меню", callback_data="back_to_main")
-        reply_markup = kb.as_markup()  # ← Здесь можно, потому что kb — Builder
     else:
-        text = f"""
+        premium_text = """
+<b>Стандартная версия</b>
+
+Хочешь:
+• Контакты хозяев
+• Приоритет в поиске
+
+→ Выбери подписку ниже
+        """
+
+    # === ИЗБРАННОЕ — ВСЕГДА ДОСТУПНО ===
+    if not favorite_ids:
+        favorites_text = "<i>В избранном пока ничего нет</i>"
+    else:
+        favorites_text = f"<b>Избранное ({len(favorite_ids)}):</b>"
+
+    # === Клавиатура ===
+    kb = InlineKeyboardBuilder()
+
+    # Избранное — всегда показываем
+    if favorite_ids:
+        kb.button(text="Очистить избранное", callback_data="clear_favorites")
+
+    # Оплата — только если НЕ премиум
+    if not info["is_premium"]:
+        kb.row(
+            InlineKeyboardButton(text="1000 Stars → 7 дней", callback_data="pay_stars_7"),
+            InlineKeyboardButton(text="2000 Stars → 30 дней", callback_data="pay_stars_30")
+        )
+
+    kb.button(text="Назад в меню", callback_data="back_to_main")
+
+    # === Отправляем профиль ===
+    text = f"""
 Привет, <b>{name}</b>!
 
-Сейчас ты на стандартной версии
+{premium_text}
 
-Хочешь контакты хозяев и приоритет в поиске?
-
-Выбери удобный способ оплаты:
-        """
-        reply_markup = payment_menu_kb()  # ← Прямо функция, без .as_markup()
+{favorites_text}
+    """.strip()
 
     await message.answer(
-        text.strip(),
-        reply_markup=reply_markup,
+        text,
+        reply_markup=kb.as_markup(),
+        parse_mode="HTML",
         disable_web_page_preview=True
     )
+
+    # === Если есть избранное — показываем объекты ===
+    if favorite_ids:
+        props = []
+        for prop_id in favorite_ids[:20]:  # лимит 20
+            prop = get_property_by_id(prop_id)
+            if prop:
+                props.append(prop)
+
+        if props:
+            await message.answer("Твоё избранное:")
+            await show_results(message, props)
+        else:
+            await message.answer("Некоторые объекты из избранного были удалены")
 
 # Возврат в главное меню
 @router.callback_query(F.data == "back_to_main")
