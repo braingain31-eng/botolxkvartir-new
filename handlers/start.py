@@ -139,7 +139,7 @@ async def show_profile_menu(message: Message):
         favorites_text = f"<b>Избранное ({len(favorite_ids)}):</b>"
 
     # === Клавиатура ===
-    kb = InlineKeyboardBuilder()
+    kb = InlineKeyboardMarkup(row_width=1)
 
     # Избранное — всегда показываем
     if favorite_ids:

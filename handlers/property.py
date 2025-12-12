@@ -1,6 +1,6 @@
 # handlers/property.py
 from aiogram import Router, F
-from aiogram.types import CallbackQuery, InlineKeyboardButton
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from database.firebase_db import get_property_by_id, get_user_premium_info, is_favorite, add_favorite, remove_favorite
 import logging
@@ -59,7 +59,7 @@ async def show_property_details(call: CallbackQuery):
     """.strip()
 
     # Клавиатура
-    kb = InlineKeyboardBuilder()
+    kb = InlineKeyboardMarkup(row_width=1)
     
     if is_premium:
         kb.add(InlineKeyboardButton(text="Открыть в OLX", url=prop['olx_url']))
