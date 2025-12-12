@@ -143,16 +143,14 @@ async def show_profile_menu(message: Message):
 
     # Избранное — всегда показываем
     if favorite_ids:
-        kb.button(text="Очистить избранное", callback_data="clear_favorites")
+        kb.add(InlineKeyboardButton(text="Очистить избранное", callback_data="clear_favorites"))
 
     # Оплата — только если НЕ премиум
     if not info["is_premium"]:
-        kb.row(
-            InlineKeyboardButton(text="1000 Stars → 7 дней", callback_data="pay_stars_7"),
-            InlineKeyboardButton(text="2000 Stars → 30 дней", callback_data="pay_stars_30")
-        )
+        kb.add(InlineKeyboardButton(text="1000 Stars → 7 дней", callback_data="pay_stars_7"))
+        kb.add(InlineKeyboardButton(text="2000 Stars → 30 дней", callback_data="pay_stars_30"))
 
-    kb.button(text="Назад в меню", callback_data="back_to_main")
+    kb.add(InlineKeyboardButton(text="Назад в меню", callback_data="back_to_main"))
 
     # === Отправляем профиль ===
     text = f"""

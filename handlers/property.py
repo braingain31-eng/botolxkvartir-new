@@ -62,17 +62,17 @@ async def show_property_details(call: CallbackQuery):
     kb = InlineKeyboardBuilder()
     
     if is_premium:
-        kb.button(text="Открыть в OLX", url=prop['olx_url'])
+        kb.add(InlineKeyboardButton(text="Открыть в OLX", url=prop['olx_url']))
     else:
-        kb.button(text="Купить премиум", callback_data="pay_premium")
+        kb.add(InlineKeyboardButton(text="Купить премиум", callback_data="pay_premium"))
 
     # Проверяем, в избранном ли объект
     is_fav = is_favorite(call.from_user.id, prop_id)
     fav_text = "Убрать из избранного" if is_fav else "Сохранить в избранное"
     fav_data = f"remove_fav_{prop_id}" if is_fav else f"add_fav_{prop_id}"
-    kb.button(text=fav_text, callback_data=fav_data)
+    kb.add(InlineKeyboardButton(text=fav_text, callback_data=fav_data))
 
-    kb.button(text="Назад", callback_data="back")
+    kb.add(InlineKeyboardButton(text="Назад", callback_data="back"))
 
     try:
         if call.message.photo or call.message.video:
