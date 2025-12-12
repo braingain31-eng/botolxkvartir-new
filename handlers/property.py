@@ -72,7 +72,7 @@ async def show_property_details(call: CallbackQuery):
     fav_data = f"remove_fav_{prop_id}" if is_fav else f"add_fav_{prop_id}"
     kb.button(text=fav_text, callback_data=fav_data)
 
-    kb.button(text="Назад", callback_data="back")
+    # kb.button(text="Назад", callback_data="back")
 
     kb.adjust(1)  # ← обязательно, если хочешь 100% столбик
 

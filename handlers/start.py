@@ -148,7 +148,7 @@ async def show_profile_menu(message: Message):
         kb.button(text="1000 Stars → 7 дней", callback_data="pay_stars_7")
         kb.button(text="2000 Stars → 30 дней", callback_data="pay_stars_30")
 
-    kb.button(text="Назад в меню", callback_data="back_to_main")
+    # kb.button(text="Назад в меню", callback_data="back_to_main")
 
     kb.adjust(1)  # ← обязательно, если хочешь 100% столбик
 
@@ -219,3 +219,45 @@ async def show_payment_options(call: CallbackQuery):
             ])
         )
     await call.answer()
+
+# === Обработка кнопки "Очистить избранное" ===
+@router.callback_query(F.data == "clear_favorites")
+async def clear_favorites_confirm(call: CallbackQuery):
+    user_id = call.from_user.id
+    user = get_user(user_id)
+    favorite_ids = user.get("favorites", []) if user else []
+
+    if not favorite_ids:
+        await call.answer("Избранное уже пустое", show_alert=True)
+        return
+
+    # Клавиатура с подтверждением
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Да, очистить всё", callback_data="confirm_clear_fav")
+    kb.button(text="Отмена", callback_data="cancel_clear_fav")
+    kb.adjust(1)
+
+    await call.message.edit_reply_markup(reply_markup=kb.as_markup())
+    await call.answer("Ты уверен?")
+
+
+# === Подтверждение очистки ===
+@router.callback_query(F.data == "confirm_clear_fav")
+async def confirm_clear_favorites(call: CallbackQuery):
+    user_id = call.from_user.id
+    
+    # ОЧИЩАЕМ избранное в базе
+    create_or_update_user(user_id, favorites=[])
+
+    # Перерисовываем профиль заново
+    await show_profile_menu(call.message)
+    
+    await call.answer("Избранное очищено!", show_alert=True)
+
+
+# === Отмена очистки ===
+@router.callback_query(F.data == "cancel_clear_fav")
+async def cancel_clear_favorites(call: CallbackQuery):
+    # Просто возвращаем исходную клавиатуру профиля
+    await show_profile_menu(call.message)
+    await call.answer("Отменено")
