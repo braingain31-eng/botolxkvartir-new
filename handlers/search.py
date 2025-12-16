@@ -245,9 +245,12 @@ async def smart_search(message: Message, user_query: str):
     }
     order_by = order_by_map.get(sort, "price_day_inr")
 
+    logger.info(f"даные для выборки из бд : {filters}...")
     # === 1. ИДЕАЛЬНЫЕ СОВПАДЕНИЯ (все фильтры) ===
     perfect_matches = get_properties(filters=filters.copy(), order_by=order_by, limit=50)
     seen_ids = {p["id"] for p in perfect_matches}
+
+    logger.info(f"даные из бд : {perfect_matches}...")
 
     # === 2. ЧАСТИЧНЫЕ СОВПАДЕНИЯ (по одному фильтру) ===
     partial_matches = []
