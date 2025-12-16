@@ -188,7 +188,8 @@ async def smart_search(message: Message, user_query: str):
 
     # === ОБРАБОТКА ФИЛЬТРОВ ===
     raw_filters = data.get("filters", {})
-    filters = {k: v for k, v in raw_filters.items() if v is not None}
+    # filters = {k: v for k, v in raw_filters.items() if v is not None}
+    filters = {}
 
     # === ОБРАБОТКА РАЙОНОВ ===
     raw_area = raw_filters.get("area")
@@ -216,7 +217,7 @@ async def smart_search(message: Message, user_query: str):
         suggested_gte = int(price_lte * 0.7)
         filters["price_day_inr__gte"] = suggested_gte
         # НЕ ставим __lte — пусть будет всё дороже тоже
-        logger.info(f"Бюджет до {price_lte} → расширяем поиск от {suggested_gte} и выше")
+        # logger.info(f"Бюджет до {price_lte} → расширяем поиск от {suggested_gte} и выше")
 
     # Если указана только нижняя граница
     elif price_gte and not price_lte:
@@ -247,47 +248,47 @@ async def smart_search(message: Message, user_query: str):
 
     logger.info(f"даные для выборки из бд : {filters}...")
     # === 1. ИДЕАЛЬНЫЕ СОВПАДЕНИЯ (все фильтры) ===
-    perfect_matches = get_properties(filters=filters.copy(), order_by=order_by, limit=50)
-    seen_ids = {p["id"] for p in perfect_matches}
+    result = get_properties(filters=filters.copy(), order_by=order_by, limit=50)
+    # seen_ids = {p["id"] for p in perfect_matches}
 
-    logger.info(f"даные из бд : {perfect_matches}...")
+    # logger.info(f"даные из бд : {perfect_matches}...")
 
-    # === 2. ЧАСТИЧНЫЕ СОВПАДЕНИЯ (по одному фильтру) ===
-    partial_matches = []
+    # # === 2. ЧАСТИЧНЫЕ СОВПАДЕНИЯ (по одному фильтру) ===
+    # partial_matches = []
 
-    # По каждому району отдельно
-    for area in selected_areas:
-        partial = get_properties(
-            filters={"area": area},
-            order_by="price_day_inr",
-            limit=8
-        )
-        for p in partial:
-            if p["id"] not in seen_ids and len(partial_matches) < 20:
-                partial_matches.append(p)
-                seen_ids.add(p["id"])
+    # # По каждому району отдельно
+    # for area in selected_areas:
+    #     partial = get_properties(
+    #         filters={"area": area},
+    #         order_by="price_day_inr",
+    #         limit=8
+    #     )
+    #     for p in partial:
+    #         if p["id"] not in seen_ids and len(partial_matches) < 20:
+    #             partial_matches.append(p)
+    #             seen_ids.add(p["id"])
 
-    # По цене (если указана)
-    if "price_day_inr__lte" in filters:
-        partial = get_properties(
-            filters={"price_day_inr__lte": filters["price_day_inr__lte"]},
-            order_by="price_day_inr",
-            limit=8
-        )
-        for p in partial:
-            if p["id"] not in seen_ids and len(partial_matches) < 20:
-                partial_matches.append(p)
-                seen_ids.add(p["id"])
+    # # По цене (если указана)
+    # if "price_day_inr__lte" in filters:
+    #     partial = get_properties(
+    #         filters={"price_day_inr__lte": filters["price_day_inr__lte"]},
+    #         order_by="price_day_inr",
+    #         limit=8
+    #     )
+    #     for p in partial:
+    #         if p["id"] not in seen_ids and len(partial_matches) < 20:
+    #             partial_matches.append(p)
+    #             seen_ids.add(p["id"])
 
-    # === 3. ФИНАЛЬНЫЙ СПИСОК ===
-    final_results = perfect_matches + partial_matches
+    # # === 3. ФИНАЛЬНЫЙ СПИСОК ===
+    # final_results = perfect_matches + partial_matches
 
-    if not final_results:
-        final_results = get_properties(order_by="price_day_inr", limit=20)
+    if not result:
+        result = get_properties(order_by="price_day_inr", limit=20)
         await message.answer("По точным критериям ничего не нашёл.\n"
                            "Показываю лучшие доступные варианты:")
     else:
-        perfect_count = len(perfect_matches)
+        perfect_count = len(result)
         if perfect_count > 0:
             await message.answer(
                 f"Нашёл {perfect_count} идеальных вариантов по всем твоим критериям!\n\n"
@@ -297,7 +298,7 @@ async def smart_search(message: Message, user_query: str):
         else:
             await message.answer("Точных совпадений нет, но вот хорошие варианты по твоим фильтрам:")
 
-    await show_results(message, final_results[:30])
+    await show_results(message, result)
 
 
 # # === Отправка карточек с кэшированием фото ===
