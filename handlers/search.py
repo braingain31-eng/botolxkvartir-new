@@ -251,7 +251,7 @@ async def smart_search(message: Message, user_query: str):
     result = get_properties(filters=filters.copy(), order_by=order_by, limit=50)
     # seen_ids = {p["id"] for p in perfect_matches}
 
-    logger.info(f"даные из бд : {perfect_matches}...")
+    logger.info(f"даные из бд : {result}...")
 
     # # === 2. ЧАСТИЧНЫЕ СОВПАДЕНИЯ (по одному фильтру) ===
     # partial_matches = []
