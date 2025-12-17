@@ -40,11 +40,11 @@ app = Flask(__name__)
 
 # Регистрация роутеров
 dp.include_router(start.router)
-dp.include_router(search.router)
 dp.include_router(payment.router)
 dp.include_router(agent.router)
 dp.include_router(errors.router)
 dp.include_router(property_router)
+dp.include_router(search.router)
 
 # --- URL Вебхука ---
 WEBHOOK_PATH = "/webhook"
