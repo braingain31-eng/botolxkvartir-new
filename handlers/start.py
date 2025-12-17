@@ -168,19 +168,19 @@ async def show_profile_menu(message: Message):
         disable_web_page_preview=True
     )
 
-    # === Если есть избранное — показываем объекты ===
-    if favorite_ids:
-        props = []
-        for prop_id in favorite_ids[:20]:  # лимит 20
-            prop = get_property_by_id(prop_id)
-            if prop:
-                props.append(prop)
+    # # === Если есть избранное — показываем объекты ===
+    # if favorite_ids:
+    #     props = []
+    #     for prop_id in favorite_ids[:20]:  # лимит 20
+    #         prop = get_property_by_id(prop_id)
+    #         if prop:
+    #             props.append(prop)
 
-        if props:
-            await message.answer("Твоё избранное:")
-            await show_results(message, props)
-        else:
-            await message.answer("Некоторые объекты из избранного были удалены")
+    #     if props:
+    #         await message.answer("Твоё избранное:")
+    #         await show_results(message, props)
+    #     else:
+    #         await message.answer("Некоторые объекты из избранного были удалены")
 
 @router.message(F.text == "Избранное")  # ← Исправлено: правильное написание
 async def show_izbranoe(message: Message):

@@ -161,6 +161,35 @@ def parse_page(html: str) -> list[dict]:
             photo = item.xpath('.//img/@src')
             photo_url = photo[0] if photo else None
 
+            # === НОВАЯ ЛОГИКА: парсим детали (BHK, Bathroom, sqft) ===
+            details_text = "".join(item.xpath('.//span[@data-aut-id="itemDetails"]/text()')).strip()
+            logger.debug(f"Детали объявления: '{details_text}'")
+
+            bedrooms = None
+            bathrooms = None
+            sqft = None
+
+            if details_text:
+                # Примеры: "3 BHK - 3 Bathroom - 3000 sqft", "2 BHK - 2 baths - 1500 sq.ft"
+                # Ищем число перед BHK
+                bhk_match = re.search(r'(\d+)\s*BHK', details_text, re.IGNORECASE)
+                if bhk_match:
+                    bedrooms = int(bhk_match.group(1))
+
+                # Ищем число перед Bathroom / bath / baths
+                bath_match = re.search(r'(\d+)\s*(?:Bathroom|bath|baths)', details_text, re.IGNORECASE)
+                if bath_match:
+                    bathrooms = int(bath_match.group(1))
+
+                # Ищем площадь: 3000 sqft / sq.ft / sq ft / square feet
+                sqft_match = re.search(r'(\d+(?:,\d+)?)\s*(?:sqft|sq\.ft|sq ft|square feet|sft)', details_text, re.IGNORECASE)
+                if sqft_match:
+                    sqft_str = sqft_match.group(1).replace(',', '')
+                    try:
+                        sqft = int(sqft_str)
+                    except ValueError:
+                        sqft = None
+
             ad_data = {
                 "title": title or "Property in Goa",
                 "area": area,
@@ -173,6 +202,9 @@ def parse_page(html: str) -> list[dict]:
                 "olx_url": link,
                 "location_raw": location_raw,  # Сохраняем оригинальную локацию для отладки
                 "parsed_at": datetime.utcnow().isoformat(),
+                "bedrooms": bedrooms,        
+                "bathrooms": bathrooms,      
+                "sqft": sqft,
             }
 
             ads.append(ad_data)

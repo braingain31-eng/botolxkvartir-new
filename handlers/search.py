@@ -368,21 +368,75 @@ async def show_results(message: Message, props: list):
             message.bot.search_cache = {}
         message.bot.search_cache[message.from_user.id] = props[chunk_size:]
 
+# async def _send_property_card(message_or_call, prop: dict, number: int):
+#     title = prop.get("title", "Жильё в Гоа")
+#     area = prop.get("area", "Гоа")
+#     price_inr = prop.get("price_day_inr", 0)
+#     guests = prop.get("guests", 2)
+#     photo_url = prop.get("photos", [None])[0]
+
+#     caption = f"<b>{number}. {title}</b>\n" \
+#               f"{area} • ₹{price_inr:,}\n" \
+#               f"до {guests} гостей".replace(",", " ")
+
+#     kb = InlineKeyboardBuilder()
+#     kb.button(text="Подробнее", callback_data=f"prop_{prop.get('id')}")
+#     kb.button(text="Написать хозяину", callback_data=f"contact_{prop.get('id')}")
+
+#     if isinstance(message_or_call, Message):
+#         await send_cached_photo(message_or_call, photo_url, caption, kb.as_markup())
+#     else:  # CallbackQuery
+#         await send_cached_photo(message_or_call.message, photo_url, caption, kb.as_markup())
+
 async def _send_property_card(message_or_call, prop: dict, number: int):
     title = prop.get("title", "Жильё в Гоа")
     area = prop.get("area", "Гоа")
     price_inr = prop.get("price_day_inr", 0)
-    guests = prop.get("guests", 2)
+    guests = prop.get("guests", 0) or "?"
+    
+    # === Новые поля ===
+    bedrooms = prop.get("bedrooms")
+    bathrooms = prop.get("bathrooms")
+    sqft = prop.get("sqft")
+
     photo_url = prop.get("photos", [None])[0]
 
-    caption = f"<b>{number}. {title}</b>\n" \
-              f"{area} • ₹{price_inr:,}\n" \
-              f"до {guests} гостей".replace(",", " ")
+    # === Формируем подпись ===
+    caption_lines = [f"<b>{number}. {title}</b>"]
 
+    # Район и цена
+    caption_lines.append(f"<b>{area}</b> • ₹ {price_inr:,}".replace(",", " "))
+
+    # Характеристики
+    features = []
+
+    if bedrooms:
+        features.append(f"{bedrooms} спальн{'и' if bedrooms == 1 else 'и' if 2 <= bedrooms <= 4 else 'ей'}")
+    if bathrooms:
+        features.append(f"{bathrooms} {'ванная' if bathrooms == 1 else 'ванных'}")
+    if sqft:
+        features.append(f"{sqft} sqft")
+
+    if guests and guests > 0:
+        features.append(f"до {guests} {'гостя' if guests == 1 else 'гостей' if 2 <= guests <= 4 else 'гостей'}")
+
+    if features:
+        caption_lines.append(" • ".join(features))
+
+    caption = "\n".join(caption_lines)
+
+    # === Клавиатура ===
     kb = InlineKeyboardBuilder()
+
     kb.button(text="Подробнее", callback_data=f"prop_{prop.get('id')}")
+    
+    # Кнопка "Написать хозяину" — только для премиум-пользователей
+    # (если нужно — добавь проверку is_premium)
     kb.button(text="Написать хозяину", callback_data=f"contact_{prop.get('id')}")
 
+    kb.adjust(1)  # в столбик
+
+    # === Отправка фото ===
     if isinstance(message_or_call, Message):
         await send_cached_photo(message_or_call, photo_url, caption, kb.as_markup())
     else:  # CallbackQuery
