@@ -85,7 +85,7 @@ def payment_menu_kb():
         InlineKeyboardButton(text="1000 Stars → 7 дней", callback_data="pay_stars_7"),
         InlineKeyboardButton(text="2000 Stars → 30 дней", callback_data="pay_stars_30")
     )
-    kb.button(text="Назад", callback_data="back_to_search")
+    # kb.button(text="Назад", callback_data="back_to_search")
     kb.adjust(1)
     return kb.as_markup()
 

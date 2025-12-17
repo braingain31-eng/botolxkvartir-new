@@ -53,7 +53,6 @@ async def show_property_details(call: CallbackQuery):
 <b>{prop['title']}</b>
 
 {prop['area']} • ₹{prop['price_day_inr']}/день
-Источник: OLX.in
 
 {url}
     """.strip()
@@ -114,6 +113,15 @@ async def remove_from_favorites(call: CallbackQuery):
 @router.callback_query(F.data == "back_to_search")
 async def back_to_search(call: CallbackQuery):
     await call.message.delete()  # или edit на предыдущее сообщение
+    await call.answer()
+
+@router.callback_query(F.data == "pay_premium")
+async def pay_premium(call: CallbackQuery):
+    await call.message.edit_text(
+        "**Выберите способ оплаты:**\\n\\n",
+        reply_markup=payment_menu_kb(),
+        parse_mode="Markdown"
+    )
     await call.answer()
 
 @router.callback_query(F.data.startswith("contact_"))
