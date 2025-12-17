@@ -41,24 +41,38 @@ async def register_agent(message: Message):
 
 @router.message(F.text == "Для риэлторов")
 async def show_realter(message: Message):
-    user_id = message.from_user.id
-    await agent_menu()
+    await agent_menu(message)
+
+@router.callback_query(F.data == "agent_menu")
+async def agent_menu_callback(call: CallbackQuery):
+    await agent_menu(call)
 
 # === Меню риэлтора ===
-@router.callback_query(F.data == "agent_menu")
-async def agent_menu(call: CallbackQuery):
+async def agent_menu(msg_or_call):
     kb = InlineKeyboardBuilder()
     kb.button(text="Добавить объект", callback_data="start_add_property")
     kb.button(text="Мои объекты", callback_data="my_properties")
     kb.button(text="Статистика", callback_data="agent_stats")
     kb.adjust(1)
 
-    await call.message.edit_text(
-        "Риэлторское меню\n\n"
-        "Добавьте 5 объектов за неделю → +7 дней премиум бесплатно!",
-        reply_markup=kb.as_markup()
+    text = (
+        "<b>Риэлторское меню</b>\n\n"
+        "Добавьте 5 объектов за неделю → +7 дней премиум бесплатно!"
     )
-    await call.answer()
+
+    if isinstance(msg_or_call, Message):
+        await msg_or_call.answer(
+            text,
+            reply_markup=kb.as_markup(),
+            parse_mode="HTML"
+        )
+    else:  # CallbackQuery
+        await msg_or_call.message.edit_text(
+            text,
+            reply_markup=kb.as_markup(),
+            parse_mode="HTML"
+        )
+        await msg_or_call.answer()
 
 
 # === Начало добавления объекта ===
