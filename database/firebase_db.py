@@ -3,7 +3,8 @@
 import firebase_admin
 from firebase_admin import credentials, firestore
 from firebase_admin import firestore as fs_admin
-from google.cloud.firestore_v1 import FieldFilter
+from google.cloud.firestore_v1 import FieldFilter, Query
+from google.api_core.exceptions import FailedPrecondition
 from datetime import datetime, timedelta, timezone
 import config
 import logging
@@ -72,58 +73,132 @@ def activate_premium(user_id: int, days: int = 30, reason: str = "manual"):
         return False
 
 # === PROPERTIES — ГЛАВНАЯ ФУНКЦИЯ С ПОДДЕРЖКОЙ order_by ===
+# def get_properties(
+#     filters: dict = None,
+#     order_by: str = None,      # Новый параметр: "price_day", "-price_day", "created_at", "-created_at"
+#     limit: int = 10
+# ):
+#     """
+#     Универсальная выборка активных объектов
+#     filters: {"price_day__lte": 300, "area": "Anjuna"}
+#     order_by: "price_day" (по возрастанию), "-price_day" (по убыванию)
+#     """
+#     try:
+#         # Базовый запрос — только активные объекты
+#         query = db.collection('properties').where(filter=FieldFilter("status", "==", "active"))
+
+#         # Применяем фильтры
+#         if filters:
+#             for k, v in filters.items():
+#                 if v is None:
+#                     continue
+#                 if '__lte' in k:
+#                     field = k.replace('__lte', '')
+#                     query = query.where(filter=FieldFilter(field, '<=', v))
+#                 elif '__gte' in k:
+#                     field = k.replace('__gte', '')
+#                     query = query.where(filter=FieldFilter(field, '>=', v))
+#                 elif '__in' in k:
+#                     field = k.replace('__in', '')
+#                     query = query.where(filter=FieldFilter(field, 'in', v))
+#                 else:
+#                     query = query.where(filter=FieldFilter(k, '==', v))
+
+#         # Применяем сортировку
+#         if order_by:
+#             field_name = order_by.lstrip('-')
+#             direction = fs_admin.Query.DESCENDING if order_by.startswith('-') else fs_admin.Query.ASCENDING
+#             query = query.order_by(field_name, direction=direction)
+
+#         # Лимит
+#         query = query.limit(limit)
+
+#         # Выполняем
+#         docs = query.stream()
+#         results = []
+#         for doc in docs:
+#             data = doc.to_dict()
+#             data["id"] = doc.id
+#             results.append(data)
+
+#         return results
+
+#     except Exception as e:
+#         logger.error(f"Ошибка в get_properties: {e}")
+#         return []
+
 def get_properties(
-    filters: dict = None,
-    order_by: str = None,      # Новый параметр: "price_day", "-price_day", "created_at", "-created_at"
-    limit: int = 10
+    filters: dict | None = None,
+    order_by: str | None = None,
+    limit: int = 20,                    # Повысил дефолт — 10 слишком мало
+    allow_inactive: bool = False        # Новый параметр — для админки
 ):
     """
-    Универсальная выборка активных объектов
-    filters: {"price_day__lte": 300, "area": "Anjuna"}
-    order_by: "price_day" (по возрастанию), "-price_day" (по убыванию)
+    Универсальная выборка объектов из Firestore с поддержкой:
+    - фильтров (==, >=, <=, in)
+    - сортировки (asc/desc)
+    - лимита
+    - автоматический fallback при отсутствии индекса
     """
     try:
-        # Базовый запрос — только активные объекты
-        query = db.collection('properties').where(filter=FieldFilter("status", "==", "active"))
+        collection = db.collection('properties')
 
-        # Применяем фильтры
+        # Базовый фильтр — только активные (если не для админа)
+        if not allow_inactive:
+            query = collection.where(filter=FieldFilter("status", "==", "active"))
+        else:
+            query = collection
+
+        # Применяем пользовательские фильтры
         if filters:
-            for k, v in filters.items():
-                if v is None:
+            for key, value in filters.items():
+                if value is None:
                     continue
-                if '__lte' in k:
-                    field = k.replace('__lte', '')
-                    query = query.where(filter=FieldFilter(field, '<=', v))
-                elif '__gte' in k:
-                    field = k.replace('__gte', '')
-                    query = query.where(filter=FieldFilter(field, '>=', v))
-                elif '__in' in k:
-                    field = k.replace('__in', '')
-                    query = query.where(filter=FieldFilter(field, 'in', v))
-                else:
-                    query = query.where(filter=FieldFilter(k, '==', v))
 
-        # Применяем сортировку
+                if '__lte' in key:
+                    field = key.replace('__lte', '')
+                    query = query.where(filter=FieldFilter(field, '<=', value))
+                elif '__gte' in key:
+                    field = key.replace('__gte', '')
+                    query = query.where(filter=FieldFilter(field, '>=', value))
+                elif '__in' in key:
+                    field = key.replace('__in', '')
+                    query = query.where(filter=FieldFilter(field, 'in', value))
+                else:
+                    # Для == или других
+                    query = query.where(filter=FieldFilter(key, '==', value))
+
+        # Сортировка
         if order_by:
             field_name = order_by.lstrip('-')
-            direction = fs_admin.Query.DESCENDING if order_by.startswith('-') else fs_admin.Query.ASCENDING
+            direction = Query.DESCENDING if order_by.startswith('-') else Query.ASCENDING
             query = query.order_by(field_name, direction=direction)
 
         # Лимит
         query = query.limit(limit)
 
-        # Выполняем
+        # Выполняем запрос
         docs = query.stream()
-        results = []
-        for doc in docs:
-            data = doc.to_dict()
-            data["id"] = doc.id
-            results.append(data)
+
+        # Современный способ: list comprehension + merge dict
+        results = [doc.to_dict() | {"id": doc.id} for doc in docs]
 
         return results
 
+    except FailedPrecondition as e:
+        # Ошибка индекса — возвращаем fallback (по цене asc)
+        logger.warning(f"Нет индекса для запроса: {e}. Используем fallback.")
+        fallback_query = (
+            db.collection('properties')
+            .where(filter=FieldFilter("status", "==", "active"))
+            .order_by("price_day_inr", direction=Query.ASCENDING)
+            .limit(limit)
+        )
+        docs = fallback_query.stream()
+        return [doc.to_dict() | {"id": doc.id} for doc in docs]
+
     except Exception as e:
-        logger.error(f"Ошибка в get_properties: {e}")
+        logger.error(f"Ошибка в get_properties: {e}", exc_info=True)
         return []
 
 

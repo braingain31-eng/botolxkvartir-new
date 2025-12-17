@@ -184,7 +184,6 @@ async def smart_search(message: Message, user_query: str):
             logger.warning(f"Grok вернул невалидный JSON, используем дефолт. Ошибка: {e}\nОтвет был: {grok_response[:300]}")
             data = {"action": "search", "filters": {}, "sort": "price_asc", "limit": null}
 
-    await thinking.delete()
 
     # === ОБРАБОТКА ФИЛЬТРОВ ===
     raw_filters = data.get("filters", {})
@@ -282,6 +281,7 @@ async def smart_search(message: Message, user_query: str):
 
     # # === 3. ФИНАЛЬНЫЙ СПИСОК ===
     # final_results = perfect_matches + partial_matches
+    await thinking.delete()
 
     if not result:
         result = get_properties(order_by="price_day_inr", limit=20)

@@ -182,6 +182,66 @@ async def show_profile_menu(message: Message):
         else:
             await message.answer("Некоторые объекты из избранного были удалены")
 
+@router.message(F.text == "Избранное")  # ← Исправлено: правильное написание
+async def show_izbranoe(message: Message):
+    user_id = message.from_user.id
+    name = message.from_user.full_name or "Гость"
+
+    # Получаем данные пользователя
+    user = get_user(user_id)
+    favorite_ids = user.get("favorites", []) if user else []
+
+    # Собираем объекты избранного
+    props = []
+    removed_count = 0
+    for prop_id in favorite_ids[:30]:  # чуть больше, на всякий случай
+        prop = get_property_by_id(prop_id)
+        if prop and prop.get("status") == "active":  # только активные
+            props.append(prop)
+        else:
+            removed_count += 1
+
+    # === Текст ===
+    if not props:
+        text = """
+<b>Избранное пустое</b> 😔
+
+Добавляй понравившиеся виллы в избранное — они появятся здесь!
+
+Вернись в поиск и найди что-то крутое ❤️
+        """.strip()
+        
+        # Кнопки нет — смысла очищать пустое нет
+        kb = None
+    else:
+        count = len(props)
+        text = f"""
+<b>Твоё избранное ({count})</b> ❤️
+
+Вот что ты сохранил:
+        """.strip()
+
+        # Клавиатура с очисткой
+        kb = InlineKeyboardBuilder()
+        kb.button(text="Очистить избранное", callback_data="clear_favorites")
+        kb.adjust(1)
+        reply_markup = kb.as_markup()
+    # === Отправляем всё одним сообщением + карточки ===
+    await message.answer(
+        text,
+        reply_markup=reply_markup if props else None,
+        parse_mode="HTML",
+        disable_web_page_preview=True
+    )
+
+    # Показываем объекты (если есть)
+    if props:
+        await show_results(message, props)
+
+    # Уведомляем, если что-то удалено
+    if removed_count > 0:
+        await message.answer(f"ℹ️ {removed_count} объект(а) из избранного были удалены хозяином")
+
 # Возврат в главное меню
 @router.callback_query(F.data == "back_to_main")
 async def back_to_main(call: CallbackQuery):

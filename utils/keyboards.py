@@ -4,7 +4,7 @@ from aiogram.types import InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardBut
 
 def start_kb() -> ReplyKeyboardMarkup:
     keyboard = [
-        [KeyboardButton(text="Топ-10 до $500"), KeyboardButton(text="Все варианты")],
+        [KeyboardButton(text="Топ-10 до $500"), KeyboardButton(text="Все варианты"), KeyboardButton(text="Избранное")],
         [KeyboardButton(text="Для риэлторов"), KeyboardButton(text="Профиль")]
     ]
     return ReplyKeyboardMarkup(
