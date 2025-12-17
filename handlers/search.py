@@ -250,7 +250,7 @@ async def smart_search(message: Message, user_query: str):
     result = get_properties(filters=filters.copy(), order_by=order_by, limit=50)
     # seen_ids = {p["id"] for p in perfect_matches}
 
-    logger.info(f"даные из бд : {result}...")
+    logger.info(f"даные из бд : {result[:5]}...")
 
     # # === 2. ЧАСТИЧНЫЕ СОВПАДЕНИЯ (по одному фильтру) ===
     # partial_matches = []
@@ -392,7 +392,7 @@ async def _send_property_card(message_or_call, prop: dict, number: int):
     title = prop.get("title", "Жильё в Гоа")
     area = prop.get("area", "Гоа")
     price_inr = prop.get("price_day_inr", 0)
-    guests = prop.get("guests", 0) or "?"
+    # guests = prop.get("guests", 0) or "?"
     
     # === Новые поля ===
     bedrooms = prop.get("bedrooms")
@@ -417,8 +417,8 @@ async def _send_property_card(message_or_call, prop: dict, number: int):
     if sqft:
         features.append(f"{sqft} sqft")
 
-    if guests and guests > 0:
-        features.append(f"до {guests} {'гостя' if guests == 1 else 'гостей' if 2 <= guests <= 4 else 'гостей'}")
+    # if guests and guests > 0:
+    #     features.append(f"до {guests} {'гостя' if guests == 1 else 'гостей' if 2 <= guests <= 4 else 'гостей'}")
 
     if features:
         caption_lines.append(" • ".join(features))
