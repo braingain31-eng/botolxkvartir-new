@@ -39,6 +39,10 @@ async def register_agent(message: Message):
         "Чтобы добавить объект → нажмите /add_property"
     )
 
+@router.message(F.text == "Для риэлторов")
+async def show_realter(message: Message):
+    user_id = message.from_user.id
+    await agent_menu()
 
 # === Меню риэлтора ===
 @router.callback_query(F.data == "agent_menu")

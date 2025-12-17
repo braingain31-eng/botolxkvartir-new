@@ -177,10 +177,10 @@ async def cmd_all(call: CallbackQuery):
     await smart_search(call.message, "все варианты")
     await call.answer()
 
-@router.callback_query(F.data == "agent_menu")
-async def cmd_agent(call: CallbackQuery):
-    await call.message.answer("Риэлторское меню:", reply_markup=agent_menu_kb())
-    await call.answer()
+# @router.callback_query(F.data == "agent_menu")
+# async def cmd_agent(call: CallbackQuery):
+#     await call.message.answer("Риэлторское меню:", reply_markup=agent_menu_kb())
+#     await call.answer()
 
 @router.callback_query(F.data == "profile")
 async def cmd_profile(call: CallbackQuery):
