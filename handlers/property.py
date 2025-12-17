@@ -117,8 +117,8 @@ async def back_to_search(call: CallbackQuery):
 
 @router.callback_query(F.data == "pay_premium")
 async def pay_premium(call: CallbackQuery):
-    await call.message.edit_text(
-        "**Выберите способ оплаты:**\\n\\n",
+    await call.message.answer(
+        "**Выберите способ оплаты:**\n\n",
         reply_markup=payment_menu_kb(),
         parse_mode="Markdown"
     )
