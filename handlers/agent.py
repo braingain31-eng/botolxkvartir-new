@@ -39,41 +39,115 @@ async def register_agent(message: Message):
         "Чтобы добавить объект → нажмите /add_property"
     )
 
-@router.message(F.text == "Для риэлторов")
-async def show_realter(message: Message):
-    await agent_menu(message)
+# === Регистрация как риэлтор ===
+@router.callback_query(F.data == "register_agent")
+async def register_agent(call: CallbackQuery):
+    user_id = call.from_user.id
+    create_or_update_user(user_id, user_type="agent")
+    
+    await call.message.edit_text(
+        "Вы успешно зарегистрированы как риэлтор!\n\n"
+        "Теперь ваши объекты будут в приоритете.\n"
+        "Добавьте 5 объектов за неделю — получите **7 дней премиум бесплатно**!\n\n"
+        "Премиум для риэлторов:\n"
+        "• Объекты всегда в топе поиска\n"
+        "• Доступ к контактам всех владельцев\n"
+        "• Статистика просмотров ваших объектов\n"
+        "• Приоритетная поддержка\n\n"
+        "Выберите подписку, чтобы ваши объявления видели первыми:",
+        reply_markup=payment_menu_kb()
+    )
+    await call.answer("Регистрация завершена!")
 
+@router.message(F.text == "Для риэлторов")
 @router.callback_query(F.data == "agent_menu")
-async def agent_menu_callback(call: CallbackQuery):
-    await agent_menu(call)
+async def realtor_entry_handler(event: Message | CallbackQuery):
+    await realtor_entry(event)
+
+async def realtor_entry(event):
+    """
+    Обрабатывает вход в риэлторское меню.
+    Работает и с Message (текстовая кнопка), и с CallbackQuery (inline-кнопка).
+    """
+    # Определяем user_id и тип события
+    if isinstance(event, Message):
+        user_id = event.from_user.id
+        send_method = event.answer
+    else:  # CallbackQuery
+        user_id = event.from_user.id
+        send_method = event.message.edit_text
+        await event.answer()  # обязательно отвечаем на callback
+
+    user = get_user(user_id)
+
+    if user and user.get("user_type") == "agent":
+        # Уже риэлтор — показываем меню
+        await show_agent_menu(event)
+        return
+
+    # Не риэлтор — предлагаем регистрацию
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Зарегистрироваться как риэлтор", callback_data="register_agent")
+    kb.button(text="Отмена", callback_data="cancel_register")
+    kb.adjust(2)
+
+    text = (
+        "Хочешь стать риэлтором в GoaNest?\n\n"
+        "Преимущества:\n"
+        "• Твои объекты в приоритете поиска\n"
+        "• Добавь 5 объектов за неделю — +7 дней премиум бесплатно\n"
+        "• Больше клиентов без наценки\n\n"
+        "Готов?"
+    )
+
+    await send_method(text, reply_markup=kb.as_markup())
+
+@router.callback_query(F.data == "cancel_register")
+async def cancel_register(call: CallbackQuery):
+    await call.message.edit_text("Регистрация отменена. Возвращаемся в главное меню.")
+    await call.answer()
 
 # === Меню риэлтора ===
-async def agent_menu(msg_or_call):
+async def show_agent_menu(message: Message):
+    user_id = message.from_user.id
+    premium_info = get_user_premium_info(user_id)
+
     kb = InlineKeyboardBuilder()
     kb.button(text="Добавить объект", callback_data="start_add_property")
     kb.button(text="Мои объекты", callback_data="my_properties")
-    kb.button(text="Статистика", callback_data="agent_stats")
+    kb.button(text="Статистика и бонус", callback_data="agent_stats")
+    
+    # Если НЕ премиум — добавляем кнопку "🔥 Купить премиум"
+    if not premium_info["is_premium"]:
+        kb.button(text="🔥 Купить премиум", callback_data="pay_premium")
+
     kb.adjust(1)
 
-    text = (
-        "<b>Риэлторское меню</b>\n\n"
-        "Добавьте 5 объектов за неделю → +7 дней премиум бесплатно!"
+    await message.answer(
+        "Меню риэлтора:",
+        reply_markup=kb.as_markup()
     )
 
-    if isinstance(msg_or_call, Message):
-        await msg_or_call.answer(
-            text,
-            reply_markup=kb.as_markup(),
-            parse_mode="HTML"
-        )
-    else:  # CallbackQuery
-        await msg_or_call.message.edit_text(
-            text,
-            reply_markup=kb.as_markup(),
-            parse_mode="HTML"
-        )
-        await msg_or_call.answer()
+# === Обработчик покупки премиум для риэлтора ===
+@router.callback_query(F.data == "pay_premium")
+async def pay_premium_agent(call: CallbackQuery):
+    await call.message.edit_text(
+        "Премиум для риэлторов:\n\n"
+        "• Объекты в топе поиска\n"
+        "• Доступ к контактам всех владельцев\n"
+        "• Статистика просмотров\n"
+        "• Приоритетная поддержка\n\n"
+        "Выберите подписку:",
+        reply_markup=payment_menu_kb()
+    )
+    await call.answer()
 
+# === Добавление объекта (остальной код без изменений) ===
+@router.callback_query(F.data == "start_add_property")
+async def start_add_property(call: CallbackQuery, state: FSMContext):
+    await call.message.edit_text("Введите название объекта:")
+    await state.set_state(AddPropertyStates.waiting_title)
+    await call.answer()
 
 # === Начало добавления объекта ===
 @router.callback_query(F.data == "start_add_property")

@@ -135,12 +135,20 @@ async def contact_handler(call: CallbackQuery):
         # НЕ премиум — показываем красивое меню оплаты
         kb = payment_menu_kb()
 
-        await call.answer("Контакты доступны только премиум-пользователям", show_alert=True)
-        await call.message.answer(
-            "Чтобы увидеть контакты хозяина — выбери подписку:\n"
-            "Ты уже близко к лучшим вариантам",
-            reply_markup=kb
+        # await call.answer("Контакты доступны только премиум-пользователям", show_alert=True)
+        # await call.message.answer(
+        #     "Чтобы увидеть контакты хозяина — выбери подписку:\n"
+        #     "Ты уже близко к лучшим вариантам",
+        #     reply_markup=kb
+        # )
+        await call.message.edit_text(
+            "Контакты хозяина доступны только премиум-пользователям\n\n"
+            "Оплати подписку — и увидишь номер, WhatsApp и сможешь написать напрямую!\n\n"
+            "Выбери удобный способ:",
+            reply_markup=kb,
+            disable_web_page_preview=True
         )
+        await call.answer()  # отвечаем на callback
         return
 
     # Пользователь премиум — показываем контакты

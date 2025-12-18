@@ -90,13 +90,13 @@ def payment_menu_kb():
     return kb.as_markup()
 
 
-def agent_menu_kb():
-    kb = InlineKeyboardBuilder()
-    kb.button(text="Добавить объект", callback_data="start_add_property")
-    kb.button(text="Мои объекты", callback_data="my_properties")
-    kb.button(text="Статистика и бонус", callback_data="agent_stats")
-    kb.adjust(1)
-    return kb.as_markup()
+# def agent_menu_kb():
+#     kb = InlineKeyboardBuilder()
+#     kb.button(text="Добавить объект", callback_data="start_add_property")
+#     kb.button(text="Мои объекты", callback_data="my_properties")
+#     kb.button(text="Статистика и бонус", callback_data="agent_stats")
+#     kb.adjust(1)
+#     return kb.as_markup()
 
 
 def confirm_publish_kb():
