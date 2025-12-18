@@ -124,7 +124,7 @@ async def show_agent_menu(event):
     
     # Если НЕ премиум — добавляем кнопку "🔥 Купить премиум"
     if not premium_info["is_premium"]:
-        kb.button(text="🔥 Купить премиум", callback_data="pay_premium")
+        kb.button(text="🔥 Купить премиум", callback_data="pay_premium_agent")
 
     kb.adjust(1)
 
@@ -142,7 +142,7 @@ async def show_agent_menu(event):
         await event.answer()  # отвечаем на callback
 
 # === Обработчик покупки премиум для риэлтора ===
-@router.callback_query(F.data == "pay_premium")
+@router.callback_query(F.data == "pay_premium_agent")
 async def pay_premium_agent(call: CallbackQuery):
     await call.message.edit_text(
         "Премиум для риэлторов:\n\n"
@@ -154,7 +154,6 @@ async def pay_premium_agent(call: CallbackQuery):
         reply_markup=payment_menu_kb()
     )
     await call.answer()
-    await show_agent_menu(event)
 
 # === Добавление объекта (остальной код без изменений) ===
 @router.callback_query(F.data == "start_add_property")
