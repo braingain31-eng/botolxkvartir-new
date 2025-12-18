@@ -141,13 +141,13 @@ async def contact_handler(call: CallbackQuery):
         #     "Ты уже близко к лучшим вариантам",
         #     reply_markup=kb
         # )
-        await call.message.edit_text(
-            "Контакты хозяина доступны только премиум-пользователям\n\n"
-            "Оплати подписку — и увидишь номер, WhatsApp и сможешь написать напрямую!\n\n"
-            "Выбери удобный способ:",
-            reply_markup=kb,
-            disable_web_page_preview=True
-        )
+        await call.message.answer(
+                "Контакты доступны только премиум-пользователям\n\n"
+                "Оплати подписку — и увидишь номер и WhatsApp хозяина сразу!\n\n"
+                "Выбери удобный способ:",
+                reply_markup=kb,
+                reply_to_message_id=call.message.message_id  # ← КЛЮЧЕВОЕ!
+            )
         await call.answer()  # отвечаем на callback
         return
 
