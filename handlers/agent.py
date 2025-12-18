@@ -58,6 +58,7 @@ async def register_agent(call: CallbackQuery):
         reply_markup=payment_menu_kb()
     )
     await call.answer("Регистрация завершена!")
+    await show_agent_menu(event)
 
 @router.message(F.text == "Для риэлторов")
 @router.callback_query(F.data == "agent_menu")
@@ -108,8 +109,12 @@ async def cancel_register(call: CallbackQuery):
     await call.answer()
 
 # === Меню риэлтора ===
-async def show_agent_menu(message: Message):
-    user_id = message.from_user.id
+async def show_agent_menu(event):
+    """
+    Показывает меню риэлтора.
+    Работает и с Message, и с CallbackQuery.
+    """
+    user_id = event.from_user.id
     premium_info = get_user_premium_info(user_id)
 
     kb = InlineKeyboardBuilder()
@@ -123,10 +128,18 @@ async def show_agent_menu(message: Message):
 
     kb.adjust(1)
 
-    await message.answer(
-        "Меню риэлтора:",
-        reply_markup=kb.as_markup()
+    text = (
+        "<b>Меню риэлтора</b>\n\n"
+        "Добавьте 5 объектов за неделю — получите <b>+7 дней премиум бесплатно</b>\n\n"
+        "Ваши объекты в приоритете поиска"
     )
+
+    # Универсальная отправка
+    if isinstance(event, Message):
+        await event.answer(text, reply_markup=kb.as_markup(), parse_mode="HTML")
+    else:  # CallbackQuery
+        await event.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="HTML")
+        await event.answer()  # отвечаем на callback
 
 # === Обработчик покупки премиум для риэлтора ===
 @router.callback_query(F.data == "pay_premium")
@@ -141,6 +154,7 @@ async def pay_premium_agent(call: CallbackQuery):
         reply_markup=payment_menu_kb()
     )
     await call.answer()
+    await show_agent_menu(event)
 
 # === Добавление объекта (остальной код без изменений) ===
 @router.callback_query(F.data == "start_add_property")
