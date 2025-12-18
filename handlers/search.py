@@ -389,6 +389,9 @@ async def show_results(message: Message, props: list):
 #         await send_cached_photo(message_or_call.message, photo_url, caption, kb.as_markup())
 
 async def _send_property_card(message_or_call, prop: dict, number: int):
+    user_id = message_or_call.from_user.id
+    premium_info = get_user_premium_info(user_id)
+
     title = prop.get("title", "Жильё в Гоа")
     area = prop.get("area", "Гоа")
     price_inr = prop.get("price_day_inr", 0)
@@ -432,7 +435,11 @@ async def _send_property_card(message_or_call, prop: dict, number: int):
     
     # Кнопка "Написать хозяину" — только для премиум-пользователей
     # (если нужно — добавь проверку is_premium)
-    kb.button(text="Написать хозяину", callback_data=f"contact_{prop.get('id')}")
+    # kb.button(text="Написать хозяину", callback_data=f"contact_{prop.get('id')}")
+    if premium_info["is_premium"]:
+        kb.button(text="Написать хозяину", callback_data=f"contact_{prop.get('id')}")
+    else:
+        kb.button(text="Оплатить и увидеть контакты", callback_data="pay_premium")
 
     kb.adjust(1)  # в столбик
 

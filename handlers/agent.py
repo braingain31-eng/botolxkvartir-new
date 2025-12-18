@@ -90,7 +90,7 @@ async def realtor_entry(event):
     kb = InlineKeyboardBuilder()
     kb.button(text="Зарегистрироваться как риэлтор", callback_data="register_agent")
     kb.button(text="Отмена", callback_data="cancel_register")
-    kb.adjust(2)
+    kb.adjust(1)
 
     text = (
         "Хочешь стать риэлтором в GoaNest?\n\n"
