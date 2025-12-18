@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from database.firebase_db import get_user, create_or_update_user, create_agent_property
+from database.firebase_db import get_user, create_or_update_user, create_agent_property, get_user_premium_info
 from utils.agent_utils import increment_agent_property_count
 from utils.keyboards import payment_menu_kb  
 
