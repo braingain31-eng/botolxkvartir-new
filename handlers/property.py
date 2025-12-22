@@ -117,12 +117,36 @@ async def back_to_search(call: CallbackQuery):
 
 @router.callback_query(F.data == "pay_premium")
 async def pay_premium(call: CallbackQuery):
-    await call.message.answer(
-        "**Выберите способ оплаты:**\n\n",
-        reply_markup=payment_menu_kb(),
-        parse_mode="Markdown"
-    )
-    await call.answer()
+    # await call.message.answer(
+    #     "**Выберите способ оплаты:**\n\n",
+    #     reply_markup=payment_menu_kb(),
+    #     parse_mode="Markdown"
+    # )
+    # await call.answer()
+    try:
+        if call.message.photo:
+            await call.message.edit_caption(
+                caption="Контакты доступны только премиум-пользователям\n\n"
+                        "Оплати подписку — и увидишь номер и WhatsApp хозяина сразу!\n\n"
+                        "Выбери способ:",
+                reply_markup=payment_menu_kb()
+            )
+        else:
+            await call.message.edit_text(
+                "Контакты доступны только премиум-пользователям\n\n"
+                "Оплати подписку — и увидишь номер и WhatsApp хозяина сразу!\n\n"
+                "Выбери способ:",
+                reply_markup=payment_menu_kb()
+            )
+    except:
+        # Если не удалось — отправляем новое
+        await call.message.answer(
+            "Контакты доступны только премиум-пользователям\n\n"
+            "Выбери подписку:",
+            reply_markup=payment_menu_kb()
+        )
+
+    await call.answer("Требуется премиум", show_alert=True)
 
 @router.callback_query(F.data.startswith("contact_"))
 async def contact_handler(call: CallbackQuery):
