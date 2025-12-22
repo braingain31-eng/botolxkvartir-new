@@ -102,6 +102,72 @@ async def start(message: Message):
 #         disable_web_page_preview=True
 #     )
 
+@router.message(F.text == "Новый поиск")
+@router.callback_query(F.data == "new_search")
+async def realtor_entry_handler(event: Message | CallbackQuery):
+    await new_search(event)
+
+async def new_search(event):
+
+    # Определяем user_id и тип события
+    if isinstance(event, Message):
+        user_id = event.from_user.id
+        send_method = event.answer
+    else:  # CallbackQuery
+        user_id = event.from_user.id
+        send_method = event.message.edit_text
+        await event.answer()  
+
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Поиск текстом", callback_data="search_text")
+    kb.button(text="Поиск голосом", callback_data="search_voice")
+    kb.adjust(1)
+
+    text = (
+        "Новый поиск в GoaNest Bot\n\n"
+        "Как работает поиск:\n"
+        "• Произвольный запрос: Напиши текстом, что ищешь (тип жилья, бюджет, район, даты, кол-во человек).\n"
+        "• Голосовой поиск: Доступен с премиум-подпиской — говори, и ИИ обработает.\n"
+        "В базе: 20% объектов от владельцев (прямая аренда, торг), 80% от риэлторов (профессиональные варианты).\n\n"
+    )
+
+    await send_method(text, reply_markup=kb.as_markup())
+
+@router.callback_query(F.data == "search_text")
+async def search_text(call: CallbackQuery):
+
+    text = (
+        "Поиск текстом\n\n"
+        "Инструкция:\n"
+        "Напиши запрос в свободной форме.\n"
+        "Укажи:\n"
+        "• Тип жилья (вилла, бунгало, квартира)\n"
+        "• Бюджет (например, до 3000 ₿/ночь)\n"  
+        "• Район (Анжуна, Арпора и т.д.)\n"
+        "• Даты (с 15 декабря на неделю)\n"      
+        "• Кол-во человек (на 4 гостей)\n"
+        "• Дополнительно (бассейн, Wi-Fi, вид на море)\n"
+        "Пример: _Вилла на 4 человека, до 3000 ₿/ночь, в Анжуне, с 15 декабря на неделю, с бассейном\n\n"
+    )
+
+    await call.answer(text)
+
+@router.callback_query(F.data == "search_voice")
+async def search_voice(call: CallbackQuery):
+
+    text = (
+        "Поиск голосом\n\n"
+        "Голосовой поиск доступен только с премиум-подпиской!\n"
+        "Премиум даёт:\n"
+        "• Все контакты: Риэлторов и владельцев — бронь напрямую, без посредников.\n"
+        "• Голосовой поиск: Говори запрос — ИИ уточнит и найдёт.\n"  
+        "• Рассылка новых вариантов: Автоматически получай уведомления о подходящих объектах в реальном времени.\n"
+        "• Другие функции: Приоритет в выдаче, статистика просмотров (если риэлтор).\n\n"      
+    )
+
+    await call.answer(text, reply_markup=payment_menu_kb())
+
+
 @router.message(F.text == "Профиль")
 async def show_profile_menu(message: Message):
     user_id = message.from_user.id

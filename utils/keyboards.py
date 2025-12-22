@@ -4,8 +4,8 @@ from aiogram.types import InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardBut
 
 def start_kb() -> ReplyKeyboardMarkup:
     keyboard = [
-        [KeyboardButton(text="Топ-10 до $500"), KeyboardButton(text="Все варианты"), KeyboardButton(text="Избранное")],
-        [KeyboardButton(text="Для риэлторов"), KeyboardButton(text="Профиль")]
+        [KeyboardButton(text="Новый поиск"), KeyboardButton(text="Топ-10 до $500"), KeyboardButton(text="Все варианты")],
+        [KeyboardButton(text="Для риэлторов"), KeyboardButton(text="Избранное"), KeyboardButton(text="Профиль")]
     ]
     return ReplyKeyboardMarkup(
         keyboard=keyboard,
@@ -129,6 +129,7 @@ def main_menu_inline() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(
         InlineKeyboardButton(text="Топ-10 до $500", callback_data="top10"),
+        InlineKeyboardButton(text="Новый поиск", callback_data="new_search"),
         InlineKeyboardButton(text="Все варианты", callback_data="all_props")
     )
     kb.row(
