@@ -30,8 +30,8 @@ from dotenv import load_dotenv
 # Цены
 WEEK_PRICE_USD = 10.0
 MONTH_PRICE_USD = 20.0
-WEEK_PRICE_STARS = 1000
-MONTH_PRICE_STARS = 2000
+WEEK_PRICE_STARS = 5
+MONTH_PRICE_STARS = 10
 
 # Кошельки для крипты
 CRYPTO_WALLETS = {

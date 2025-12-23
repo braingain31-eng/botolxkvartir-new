@@ -52,7 +52,7 @@ async def show_property_details(call: CallbackQuery):
     text = f"""
 <b>{prop['title']}</b>
 
-{prop['area']} • ₹{prop['price_day_inr']}/день
+{prop['area']} • ₹{prop['price_day_inr']}
 
 {url}
     """.strip()
