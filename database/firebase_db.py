@@ -368,3 +368,17 @@ def is_favorite(user_id: int, prop_id: str) -> bool:
     if not user or not user.get("favorites"):
         return False
     return prop_id in user["favorites"]
+
+def delete_property(prop_id: str):
+    """
+    Удаляет объявление из Firestore по ID.
+    Возвращает True если успешно, False если ошибка.
+    """
+    try:
+        doc_ref = db.collection('properties').document(prop_id)
+        doc_ref.delete()
+        logger.info(f"Объявление успешно удалено из базы: ID {prop_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка при удалении объявления ID {prop_id}: {e}")
+        return False

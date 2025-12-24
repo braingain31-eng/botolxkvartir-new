@@ -3,7 +3,7 @@
 from aiogram import Router, F
 from aiogram.types import Message, FSInputFile, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from database.firebase_db import get_properties, get_user_premium_info
+from database.firebase_db import get_properties, get_user_premium_info, delete_property
 from utils.grok_api import ask_grok
 from utils.voice_handler import download_voice
 from utils.voice_to_text import voice_to_text
@@ -246,48 +246,28 @@ async def smart_search(message: Message, user_query: str):
     order_by = order_by_map.get(sort, "price_day_inr")
 
     logger.info(f"даные для выборки из бд : {filters}...")
-    # === 1. ИДЕАЛЬНЫЕ СОВПАДЕНИЯ (все фильтры) ===
+
     result = get_properties(filters=filters.copy(), order_by=order_by, limit=50)
-    # seen_ids = {p["id"] for p in perfect_matches}
 
     logger.info(f"даные из бд : {result[:5]}...")
 
-    # # === 2. ЧАСТИЧНЫЕ СОВПАДЕНИЯ (по одному фильтру) ===
-    # partial_matches = []
+    # result = valid_result
 
-    # # По каждому району отдельно
-    # for area in selected_areas:
-    #     partial = get_properties(
-    #         filters={"area": area},
-    #         order_by="price_day_inr",
-    #         limit=8
-    #     )
-    #     for p in partial:
-    #         if p["id"] not in seen_ids and len(partial_matches) < 20:
-    #             partial_matches.append(p)
-    #             seen_ids.add(p["id"])
-
-    # # По цене (если указана)
-    # if "price_day_inr__lte" in filters:
-    #     partial = get_properties(
-    #         filters={"price_day_inr__lte": filters["price_day_inr__lte"]},
-    #         order_by="price_day_inr",
-    #         limit=8
-    #     )
-    #     for p in partial:
-    #         if p["id"] not in seen_ids and len(partial_matches) < 20:
-    #             partial_matches.append(p)
-    #             seen_ids.add(p["id"])
-
-    # # === 3. ФИНАЛЬНЫЙ СПИСОК ===
-    # final_results = perfect_matches + partial_matches
-    await thinking.delete()
+    # await thinking.delete()
 
     if not result:
-        result = get_properties(order_by="price_day_inr", limit=20)
+
+        fallback = get_properties(order_by="price_day_inr", limit=20)
+
+        result = await valid_fotos(fallback)
+        await thinking.delete()
+
         await message.answer("По точным критериям ничего не нашёл.\n"
                            "Показываю лучшие доступные варианты:")
     else:
+        result = await valid_fotos(result)
+        await thinking.delete()
+
         perfect_count = len(result)
         if perfect_count > 0:
             await message.answer(
@@ -299,6 +279,44 @@ async def smart_search(message: Message, user_query: str):
             await message.answer("Точных совпадений нет, но вот хорошие варианты по твоим фильтрам:")
 
     await show_results(message, result)
+
+# === Асинхронная проверка и очистка объявлений без фото ===
+async def valid_fotos(result: list) -> list:
+    """
+    Фильтрует объявления: оставляет только с рабочим фото.
+    Удаляет из базы объявления без фото или с битыми ссылками.
+    """
+    if not result:
+        return []
+
+    valid_result = []
+    deleted_count = 0
+
+    for p in result:
+        photo_url = p.get("photos", [None])[0]
+
+        if photo_url:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.head(photo_url, timeout=10) as resp:
+                        if resp.status == 200:
+                            valid_result.append(p)
+                            continue  # фото работает — оставляем
+            except Exception as e:
+                logger.warning(f"Битая ссылка на фото: {photo_url} — удаляем объявление ({e})")
+
+        # Фото нет или битое — удаляем из базы
+        prop_id = p.get("id")
+        if prop_id:
+            if delete_property(prop_id):
+                deleted_count += 1
+        else:
+            logger.warning("Объявление без ID — не можем удалить")
+
+    if deleted_count > 0:
+        logger.info(f"Очищено {deleted_count} объявлений без рабочего фото")
+
+    return valid_result
 
 
 # # === Отправка карточек с кэшированием фото ===
