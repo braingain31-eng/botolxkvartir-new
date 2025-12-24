@@ -117,11 +117,32 @@ async def pay_with_stars(call: CallbackQuery):
     days = 7 if "7" in call.data else 30
     stars_amount = config.WEEK_PRICE_STARS if days == 7 else config.MONTH_PRICE_STARS
 
-    await call.message.edit_text(
-        f"Выбрано: премиум на {days} дней\n\n"
-        f"Сейчас появится кнопка оплаты ниже — нажми 'Pay ⭐️ {stars_amount} Stars'.\n"
-        f"После оплаты премиум активируется мгновенно!"
-    )
+    # === Универсальное редактирование: проверяем тип сообщения ===
+    try:
+        if call.message.photo:
+            # Сообщение с фото — редактируем подпись
+            await call.message.edit_caption(
+                caption=f"Выбрано: премиум на {days} дней\n\n"
+                        f"Сейчас появится кнопка оплаты ниже — нажми 'Pay ⭐️ {stars_amount} Stars'.\n"
+                        f"После оплаты премиум активируется мгновенно!"
+            )
+        else:
+            # Обычное текстовое сообщение — редактируем текст
+            await call.message.edit_text(
+                f"Выбрано: премиум на {days} дней\n\n"
+                f"Сейчас появится кнопка оплаты ниже — нажми 'Pay ⭐️ {stars_amount} Stars'.\n"
+                f"После оплаты премиум активируется мгновенно!"
+            )
+    except TelegramBadRequest as e:
+        if "there is no text" in str(e).lower() or "no caption" in str(e).lower():
+            # Если не удалось редактировать — отправляем новое сообщение
+            await call.message.answer(
+                f"Выбрано: премиум на {days} дней\n\n"
+                f"Сейчас появится кнопка оплаты ниже — нажми 'Pay ⭐️ {stars_amount} Stars'.\n"
+                f"После оплаты премиум активируется мгновенно!"
+            )
+        else:
+            raise e  # если другая ошибка — пробрасываем
 
     await call.message.answer_invoice(
         title=f"Премиум на {days} дней",
