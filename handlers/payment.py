@@ -117,11 +117,6 @@ async def pay_with_stars(call: CallbackQuery):
     days = 7 if "7" in call.data else 30
     stars_amount = config.WEEK_PRICE_STARS if days == 7 else config.MONTH_PRICE_STARS
 
-    # Клавиатура с кнопкой "Назад" к выбору подписки
-    kb = InlineKeyboardBuilder()
-    kb.button(text="Назад к выбору", callback_data="pay_premium")  # возвращаем к меню оплаты
-    kb.adjust(1)
-
     await call.message.answer_invoice(
         title=f"Премиум на {days} дней",
         description="Оплата через Telegram Stars",
@@ -130,7 +125,6 @@ async def pay_with_stars(call: CallbackQuery):
         currency="XTR",
         prices=[{"label": f"Доступ на {days} дней", "amount": stars_amount}],
         start_parameter="goanest-stars",
-        reply_markup=kb.as_markup(),
     )
 
 
