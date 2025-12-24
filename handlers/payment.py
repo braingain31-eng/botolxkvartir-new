@@ -117,6 +117,12 @@ async def pay_with_stars(call: CallbackQuery):
     days = 7 if "7" in call.data else 30
     stars_amount = config.WEEK_PRICE_STARS if days == 7 else config.MONTH_PRICE_STARS
 
+    await call.message.edit_text(
+        f"Выбрано: премиум на {days} дней\n\n"
+        f"Сейчас появится кнопка оплаты ниже — нажми 'Pay ⭐️ {stars_amount} Stars'.\n"
+        f"После оплаты премиум активируется мгновенно!"
+    )
+
     await call.message.answer_invoice(
         title=f"Премиум на {days} дней",
         description="Оплата через Telegram Stars",
