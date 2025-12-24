@@ -67,7 +67,7 @@ def pay_or_later_kb():
     return kb.as_markup()
 
 
-def payment_menu_kb():
+def payment_menu_kb(back_callback: str = "back_to_search") -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     # kb.row(
     #     InlineKeyboardButton(text="Карта → 7 дней ($10)", callback_data="pay_card_7"),
@@ -85,6 +85,8 @@ def payment_menu_kb():
         InlineKeyboardButton(text="1000 Stars → 7 дней", callback_data="pay_stars_7"),
         InlineKeyboardButton(text="2000 Stars → 30 дней", callback_data="pay_stars_30")
     )
+    kb.button(text="Назад", callback_data=back_callback)
+    kb.adjust(1)
     # kb.button(text="Назад", callback_data="back_to_search")
     kb.adjust(1)
     return kb.as_markup()

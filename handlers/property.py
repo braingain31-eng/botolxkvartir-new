@@ -123,27 +123,30 @@ async def pay_premium(call: CallbackQuery):
     #     parse_mode="Markdown"
     # )
     # await call.answer()
+
+    kb = payment_menu_kb(back_callback="back_to_search")
+
     try:
         if call.message.photo:
             await call.message.edit_caption(
                 caption="Контакты доступны только премиум-пользователям\n\n"
                         "Оплати подписку — и увидишь номер и WhatsApp хозяина сразу!\n\n"
                         "Выбери способ:",
-                reply_markup=payment_menu_kb()
+                reply_markup=kb
             )
         else:
             await call.message.edit_text(
                 "Контакты доступны только премиум-пользователям\n\n"
                 "Оплати подписку — и увидишь номер и WhatsApp хозяина сразу!\n\n"
                 "Выбери способ:",
-                reply_markup=payment_menu_kb()
+                reply_markup=kb
             )
     except:
         # Если не удалось — отправляем новое
         await call.message.answer(
             "Контакты доступны только премиум-пользователям\n\n"
             "Выбери подписку:",
-            reply_markup=payment_menu_kb()
+            reply_markup=kb
         )
 
     await call.answer("Требуется премиум", show_alert=True)

@@ -251,7 +251,7 @@ async def smart_search(message: Message, user_query: str):
 
     logger.info(f"даные из бд : {result[:5]}...")
 
-    # result = valid_result
+    result = await valid_fotos(result)
 
     # await thinking.delete()
 
@@ -265,7 +265,7 @@ async def smart_search(message: Message, user_query: str):
         await message.answer("По точным критериям ничего не нашёл.\n"
                            "Показываю лучшие доступные варианты:")
     else:
-        result = await valid_fotos(result)
+        # result = await valid_fotos(result)
         await thinking.delete()
 
         perfect_count = len(result)
