@@ -232,6 +232,16 @@ async def smart_search(message: Message, user_query: str):
         filters["price_day_inr__lte"] = 15000
         filters["price_day_inr__gte"] = 1000
 
+    # POMENYAL: Added handling for bedrooms__lte from Grok response
+    bedrooms_lte = raw_filters.get("bedrooms__lte")
+    if bedrooms_lte:
+        filters["bedrooms__lte"] = bedrooms_lte
+
+    # POMENYAL: Added handling for bedrooms__gte from Grok response (was already there, but ensured it's copied to filters)
+    bedrooms_gte = raw_filters.get("bedrooms__gte")
+    if bedrooms_gte:
+        filters["bedrooms__gte"] = bedrooms_gte
+
     # === СОРТИРОВКА И ЛИМИТ ===
     sort = data.get("sort", "price_asc")
     limit = data.get("limit", 20)
