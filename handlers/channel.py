@@ -1,7 +1,8 @@
 # handlers/channel.py — ЛОГИКА КАНАЛА @goa_realt (Январь 2026)
 
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, InlineKeyboardBuilder
+from aiogram.types import Message, CallbackQuery
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 
