@@ -17,6 +17,7 @@ from utils.scheduler import start_scheduler, run_olx_parser_now
 # Импортируем роутеры
 from handlers import start, search, payment, agent, errors
 from handlers.property import router as property_router
+from handlers.channel import router as channel_router
 
 # --- НАСТРОЙКА ---
 logging.basicConfig(level=logging.INFO)
@@ -42,6 +43,7 @@ app = Flask(__name__)
 dp.include_router(start.router)
 dp.include_router(payment.router)
 dp.include_router(agent.router)
+dp.include_router(channel_router)
 dp.include_router(errors.router)
 dp.include_router(property_router)
 dp.include_router(search.router)

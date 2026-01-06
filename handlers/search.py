@@ -363,27 +363,31 @@ async def show_results(message: Message, props: list):
         return
 
     total = len(props)
-    chunk_size = 10
+    chunk_size = 5
 
     # Отправляем первые 10
     for i, p in enumerate(props[:chunk_size], start=1):
         await _send_property_card(message, p, i)
 
     # Если объявлений больше 10 — показываем кнопку "Ещё"
+    kb = InlineKeyboardBuilder()
+
     if total > chunk_size:
         remaining = total - chunk_size
-        kb = InlineKeyboardBuilder()
         kb.button(
             text=f"Показать ещё {min(remaining, chunk_size)} из {remaining} ",
             callback_data=f"more_{chunk_size}"  # начало следующего чанка
         )
+        kb.button(text="Показать предложения от реалторов", callback_data=f"show_proposals_{request_id}")  # ← НОВАЯ КНОПКА
         await message.answer(
             "Это только начало!\n"
             "Я нашёл ещё варианты — хочешь посмотреть?",
             reply_markup=kb.as_markup()
         )
     else:
-        await message.answer("Это все доступные варианты на данный момент\nХочешь другой поиск — просто напиши")
+        kb.button(text="Показать предложения от реалторов", callback_data=f"show_proposals_{request_id}")  # ← НОВАЯ КНОПКА
+        await message.answer("Это все доступные варианты на данный момент\nХочешь другой поиск — просто напиши",
+            reply_markup=kb.as_markup())
 
     # Сохраняем оставшиеся объявления в состояние пользователя
     if total > chunk_size:

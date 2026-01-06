@@ -382,3 +382,69 @@ def delete_property(prop_id: str):
     except Exception as e:
         logger.error(f"Ошибка при удалении объявления ID {prop_id}: {e}")
         return False
+
+def create_request(user_id: int, query_text: str) -> str:
+    """
+    Создаёт новый запрос в collection 'requests'.
+    Статус по умолчанию 'active'.
+    """
+    request_ref = db.collection('requests').document()
+    request_id = request_ref.id
+    request_ref.set({
+        "user_id": user_id,
+        "query_text": query_text,
+        "status": "active",  # активно или неактивно
+        "timestamp": datetime.utcnow().isoformat()
+    })
+    logger.info(f"Создан запрос ID {request_id} от user {user_id}")
+    return request_id
+
+def add_proposal(request_id: str, realtor_id: int, proposal_text: str) -> bool:
+    """
+    Добавляет предложение в collection 'proposals'.
+    Привязка к request_id.
+    """
+    proposal_ref = db.collection('proposals').document()
+    proposal_ref.set({
+        "request_id": request_id,
+        "realtor_id": realtor_id,
+        "proposal_text": proposal_text,
+        "timestamp": datetime.utcnow().isoformat()
+    })
+    logger.info(f"Добавлено предложение к запросу {request_id} от риэлтора {realtor_id}")
+    return True
+
+def get_request_status(request_id: str) -> str:
+    """
+    Получает статус запроса ('active' или 'inactive').
+    Возвращает None, если запрос не найден.
+    """
+    request = db.collection('requests').document(request_id).get()
+    if request.exists:
+        return request.to_dict().get("status")
+    logger.warning(f"Запрос ID {request_id} не найден")
+    return None
+
+def set_request_status(request_id: str, status: str):
+    """
+    Устанавливает статус запроса ('active' или 'inactive').
+    """
+    if status not in ["active", "inactive"]:
+        logger.error(f"Неверный статус: {status}")
+        return False
+
+    db.collection('requests').document(request_id).update({"status": status})
+    logger.info(f"Статус запроса {request_id} изменён на {status}")
+    return True
+
+def get_proposals_by_request(request_id: str, limit: int = 10, offset: int = 0) -> list:
+    proposals = db.collection('proposals')\
+        .where("request_id", "==", request_id)\
+        .order_by("timestamp")\
+        .offset(offset)\
+        .limit(limit)\
+        .stream()
+    return [p.to_dict() for p in proposals]
+
+def get_request(request_id: str) -> dict:
+    return db.collection('requests').document(request_id).get().to_dict()
