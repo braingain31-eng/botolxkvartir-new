@@ -378,14 +378,14 @@ async def show_results(message: Message, props: list):
             text=f"Показать ещё {min(remaining, chunk_size)} из {remaining} ",
             callback_data=f"more_{chunk_size}"  # начало следующего чанка
         )
-        kb.button(text="Показать предложения от реалторов", callback_data=f"show_proposals_{request_id}")  # ← НОВАЯ КНОПКА
+        kb.button(text="Отправить запрос в канал", callback_data="send_to_channel")  # ← НОВАЯ КНОПКА
         await message.answer(
             "Это только начало!\n"
             "Я нашёл ещё варианты — хочешь посмотреть?",
             reply_markup=kb.as_markup()
         )
     else:
-        kb.button(text="Показать предложения от реалторов", callback_data=f"show_proposals_{request_id}")  # ← НОВАЯ КНОПКА
+        kb.button(text="Отправить запрос в канал", callback_data="send_to_channel")  # ← НОВАЯ КНОПКА
         await message.answer("Это все доступные варианты на данный момент\nХочешь другой поиск — просто напиши",
             reply_markup=kb.as_markup())
 
