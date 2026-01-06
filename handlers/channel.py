@@ -10,7 +10,7 @@ from database.firebase_db import (
     create_request,
     add_proposal,
     get_request_status,
-    gset_request_status,
+    set_request_status,
     get_proposals_by_request,
     get_request
 )
