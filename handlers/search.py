@@ -8,6 +8,9 @@ from utils.grok_api import ask_grok
 from utils.voice_handler import download_voice
 from utils.voice_to_text import voice_to_text
 from utils.keyboards import payment_menu_kb 
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
+
 import os
 import aiohttp
 import aiofiles
@@ -30,7 +33,7 @@ NORTH_GOA_DEFAULT_AREAS = [
 
 # === Голосовой ввод ===
 @router.message(F.voice)
-async def voice_search(message: Message):
+async def voice_search(message: Message, state: FSMContext):
     user_id = message.from_user.id
 
     premium_info = get_user_premium_info(user_id)
@@ -57,15 +60,15 @@ async def voice_search(message: Message):
         return await thinking.edit_text("Не понял речь. Напишите текстом")
 
     await thinking.edit_text(f"Понял: \"{text}\"\nАнализирую запрос...")
-    await smart_search(message, text)
+    await smart_search(message, text, state)
 
 
 # === Текстовый ввод ===
 @router.message(F.text)
-async def text_search(message: Message):
+async def text_search(message: Message, state: FSMContext):
     if message.text.startswith("/"):
         return  # команды не трогаем
-    await smart_search(message, message.text)
+    await smart_search(message, message.text, state)
 
 @router.callback_query(lambda c: c.data and c.data.startswith("more_"))
 async def show_more_properties(call: CallbackQuery):
@@ -111,7 +114,7 @@ async def show_more_properties(call: CallbackQuery):
     await call.answer()
 
 # === ГЛАВНЫЙ УМНЫЙ ПОИСК ===
-async def smart_search(message: Message, user_query: str):
+async def smart_search(message: Message, user_query: str, state: Optional[FSMContext] = None):
     thinking = await message.answer("Ищу лучшие варианты...")
     
     # Формируем строку со всеми районами для промпта
@@ -287,8 +290,8 @@ async def smart_search(message: Message, user_query: str):
             )
         else:
             await message.answer("Точных совпадений нет, но вот хорошие варианты по твоим фильтрам:")
-
-    await state.update_data(user_query=user_query)
+    if state:
+            await state.update_data(user_query=user_query)
     await show_results(message, result)
 
 # === Асинхронная проверка и очистка объявлений без фото ===
