@@ -452,9 +452,21 @@ def get_request(request_id: str) -> dict:
 def get_user_active_requests(user_id: int) -> list:
     """
     Получает все активные запросы клиента.
+    Возвращает список dict с 'request_id' и данными.
     """
-    requests = db.collection('requests').where("user_id", "==", user_id).where("status", "==", "active").stream()
-    return [r.to_dict() for r in requests]
+    requests_ref = db.collection('requests')\
+        .where("user_id", "==", user_id)\
+        .where("status", "==", "active")
+    docs = requests_ref.stream()
+
+    active_requests = []
+    for doc in docs:
+        data = doc.to_dict()
+        data["request_id"] = doc.id  # ← КЛЮЧЕВОЕ: добавляем ID документа
+        active_requests.append(data)
+    
+    return active_requests
+
 
 def deactivate_old_requests(user_id: int):
     """
@@ -462,6 +474,6 @@ def deactivate_old_requests(user_id: int):
     """
     active_requests = get_user_active_requests(user_id)
     for req in active_requests:
-        request_id = req["request_id"]
+        request_id = req["request_id"]  # теперь безопасно
         db.collection('requests').document(request_id).update({"status": "inactive"})
         logger.info(f"Деактивирован старый запрос ID {request_id} для user {user_id}")
