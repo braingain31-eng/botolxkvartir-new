@@ -12,7 +12,9 @@ from database.firebase_db import (
     get_request_status,
     set_request_status,
     get_proposals_by_request,
-    get_request
+    get_request,
+    get_user_active_requests,  # NEW: Функция для получения активных запросов клиента
+    deactivate_old_requests    # NEW: Функция для деактивации старых запросов
 )
 from utils.keyboards import payment_menu_kb
 
@@ -30,13 +32,16 @@ async def send_request_to_channel(call: CallbackQuery):
     # user_query берём из последнего сообщения (или из FSM — если сохранял в smart_search)
     user_query = call.message.text or "Запрос без текста"
 
-    # Создаём запрос в базе
+    # NEW: Деактивируем старые активные запросы клиента
+    deactivate_old_requests(user_id)
+
+    # Создаём новый запрос в базе
     request_id = create_request(user_id, user_query)
 
     # Публикуем в канал
     channel_msg = await call.bot.send_message(
         chat_id="@goa_realt",
-        text=f"Новый запрос (ID: {request_id})\n\n"
+        text=f"Новый запрос от @{call.from_user.username or 'аноним'} (ID: {request_id})\n\n"
              f"Запрос: {user_query}\n\n"
              f"Реалторы, предлагайте варианты!"
     )
@@ -51,50 +56,56 @@ async def send_request_to_channel(call: CallbackQuery):
     )
 
     # Ссылка на пост
-    # post_link = f"https://t.me/goa_realt/{channel_msg.message_id}"
+    post_link = f"https://t.me/goa_realt/{channel_msg.message_id}"
 
     await call.message.answer(
-        f"Твой запрос опубликован в канале @goa_realt!\n\n"
+        f"Твой запрос отправлен в канал @goa_realt!\n\n"
         f"ID запроса: {request_id}\n\n"
-        # f"Смотри здесь: {post_link}\n\n"
+        f"Смотри здесь: {post_link}\n\n"
         f"Как только реалторы предложат варианты — я пришлю их тебе по 10 штук с кнопкой 'Показать ещё'."
     )
     await call.answer("Запрос отправлен!")
 
 
-# === Реалтор нажимает "Предложить вариант" ===
+# === Реалтор нажимает "Предложить вариант" в канале ===
 @router.callback_query(lambda c: c.data.startswith("propose_"))
 async def propose_variant(call: CallbackQuery, state: FSMContext):
     request_id = call.data.split("_")[1]
 
-    status = get_request_status(request_id)
-    if status != "active":
-        await call.message.answer("Этот запрос уже неактивен. Предложение не принято.")
-        await call.answer("Запрос закрыт", show_alert=True)
+    # Проверяем, активен ли запрос
+    request = get_request(request_id)
+    if not request or request["status"] != "active":
+        await call.answer("Этот запрос уже неактивен. Предложение не принято.", show_alert=True)
         return
 
+    # Сохраняем request_id в состоянии
     await state.update_data(request_id=request_id)
     await state.set_state(ProposeStates.waiting_proposal)
 
-    await call.message.answer(
+    # Перебрасываем реалтора в личку бота
+    await call.bot.send_message(
+        call.from_user.id,
         f"Предложи вариант для запроса ID {request_id}:\n\n"
-        "Напиши:\n"
-        "• Адрес\n"
-        "• Цена\n"
-        "• Фото (если есть)\n"
-        "• Контакты\n\n"
+        "Напиши текст с описанием, ценой, фото (если есть), контактами.\n\n"
         "Я перешлю пользователю анонимно."
     )
-    await call.answer("Жду предложение!")
+    await call.answer("Жду предложение в личке бота!")
 
 
-# === Реалтор отправил текст предложения ===
+# === Реалтор отправляет предложение в личке бота ===
 @router.message(ProposeStates.waiting_proposal)
 async def receive_proposal(message: Message, state: FSMContext):
     data = await state.get_data()
     request_id = data["request_id"]
     realtor_id = message.from_user.id
     proposal_text = message.text
+
+    # Проверяем статус запроса перед сохранением
+    request = get_request(request_id)
+    if not request or request["status"] != "active":
+        await message.answer("Этот запрос уже неактивен. Предложение не принято.")
+        await state.clear()
+        return
 
     # Сохраняем предложение
     add_proposal(request_id, realtor_id, proposal_text)
@@ -103,15 +114,13 @@ async def receive_proposal(message: Message, state: FSMContext):
     await message.answer("Предложение отправлено пользователю! Спасибо!")
 
     # Уведомляем пользователя
-    request = get_request(request_id)
-    if request:
-        user_id = request["user_id"]
-        await message.bot.send_message(
-            user_id,
-            f"Новое предложение по твоему запросу ID {request_id}!\n\n"
-            f"{proposal_text}\n\n"
-            f"Если интересно — свяжись с риэлтором через канал @goa_realt"
-        )
+    user_id = request["user_id"]
+    await message.bot.send_message(
+        user_id,
+        f"Новое предложение по твоему запросу ID {request_id}!\n\n"
+        f"От риэлтора: {proposal_text}\n\n"
+        f"Если интересно — свяжись с риэлтором через канал @goa_realt"
+    )
 
     await state.clear()
 

@@ -448,3 +448,20 @@ def get_proposals_by_request(request_id: str, limit: int = 10, offset: int = 0) 
 
 def get_request(request_id: str) -> dict:
     return db.collection('requests').document(request_id).get().to_dict()
+
+def get_user_active_requests(user_id: int) -> list:
+    """
+    Получает все активные запросы клиента.
+    """
+    requests = db.collection('requests').where("user_id", "==", user_id).where("status", "==", "active").stream()
+    return [r.to_dict() for r in requests]
+
+def deactivate_old_requests(user_id: int):
+    """
+    Деактивирует все старые активные запросы клиента.
+    """
+    active_requests = get_user_active_requests(user_id)
+    for req in active_requests:
+        request_id = req["request_id"]
+        db.collection('requests').document(request_id).update({"status": "inactive"})
+        logger.info(f"Деактивирован старый запрос ID {request_id} для user {user_id}")
