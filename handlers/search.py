@@ -288,6 +288,7 @@ async def smart_search(message: Message, user_query: str):
         else:
             await message.answer("Точных совпадений нет, но вот хорошие варианты по твоим фильтрам:")
 
+    await state.update_data(user_query=user_query)
     await show_results(message, result)
 
 # === Асинхронная проверка и очистка объявлений без фото ===
