@@ -28,7 +28,7 @@ class ProposeStates(StatesGroup):
 
 # === Кнопка "Отправить запрос в канал" из поиска ===
 @router.callback_query(F.data == "send_to_channel")
-async def send_request_to_channel(call: CallbackQuery):
+async def send_request_to_channel(call: CallbackQuery, state: FSMContext):
     user_id = call.from_user.id
     # user_query берём из последнего сообщения (или из FSM — если сохранял в smart_search)
     # user_query = call.message.text or "Запрос без текста"
