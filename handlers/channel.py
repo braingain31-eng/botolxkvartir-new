@@ -80,19 +80,24 @@ async def propose_variant(call: CallbackQuery, state: FSMContext):
         await call.answer("Этот запрос уже неактивен. Предложение не принято.", show_alert=True)
         return
 
+    # ОТВЕЧАЕМ НА CALLBACK СРАЗУ — обязательно первым!
+    await call.answer("Открываю чат для предложения...")
+
     # Сохраняем request_id в состоянии
     await state.update_data(request_id=request_id)
     await state.set_state(ProposeStates.waiting_proposal)
 
-    # Перебрасываем реалтора в личку бота
-    await call.bot.send_message(
-        call.from_user.id,
-        f"Предложи вариант для запроса ID {request_id}:\n\n"
-        "Напиши текст с описанием, ценой, фото (если есть), контактами.\n\n"
-        "Я перешлю пользователю анонимно."
-    )
-    await call.answer("Жду предложение в личке бота!")
-
+    # Отправляем сообщение в личку (может быть медленно — но callback уже отвечен)
+    try:
+        await call.bot.send_message(
+            call.from_user.id,
+            f"Предложи вариант для запроса ID {request_id}:\n\n"
+            "Напиши текст с описанием, ценой, фото (если есть), контактами.\n\n"
+            "Я перешлю пользователю анонимно."
+        )
+    except Exception as e:
+        logger.error(f"Не удалось отправить сообщение реалтору {call.from_user.id}: {e}")
+        await call.message.answer("Не смог написать тебе в личку. Запусти бота и попробуй снова.")
 
 # === Реалтор отправляет предложение в личке бота ===
 @router.message(ProposeStates.waiting_proposal)
