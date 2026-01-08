@@ -5,6 +5,9 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
+import logging
+
+logger = logging.getLogger(__name__)
 
 from database.firebase_db import (
     create_request,
