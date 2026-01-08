@@ -10,7 +10,7 @@ from utils.voice_to_text import voice_to_text
 from utils.keyboards import payment_menu_kb 
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.filters.state import StateFilter
+from aiogram.filters.state import StateFilter, default_state
 from typing import Optional
 
 import os
