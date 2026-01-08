@@ -110,6 +110,10 @@ async def propose_variant(call: CallbackQuery, state: FSMContext):
             "Напиши текст с описанием, ценой, фото (если есть), контактами.\n\n"
             "Я перешлю пользователю анонимно."
         )
+        current_state = await state.get_state()
+        current_data = await state.get_data()
+        logger.info(f"111 Установлено состояние для user {call.from_user.id}: {current_state}")
+        logger.info(f"111 Данные состояния: {current_data}")
     except Exception as e:
         logger.error(f"Не удалось отправить сообщение реалтору {call.from_user.id}: {e}")
         await call.message.answer("Не смог написать тебе в личку. Запусти бота и попробуй снова.")
