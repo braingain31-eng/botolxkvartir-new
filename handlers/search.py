@@ -3,11 +3,12 @@
 from aiogram import Router, F
 from aiogram.types import Message, FSInputFile, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from database.firebase_db import get_properties, get_user_premium_info, delete_property
+from database.firebase_db import get_properties, get_user_premium_info, delete_property, get_user_status, set_user_status
 from utils.grok_api import ask_grok
 from utils.voice_handler import download_voice
 from utils.voice_to_text import voice_to_text
 from utils.keyboards import payment_menu_kb 
+from handlers.channel import receive_proposal
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.filters.state import StateFilter
@@ -68,13 +69,26 @@ async def voice_search(message: Message, state: FSMContext):
 # === Текстовый ввод ===
 @router.message(F.text)
 async def text_search(message: Message, state: FSMContext):
-    current_state = await state.get_state()
-    logger.info(f"text_search сработал для user {message.from_user.id}, состояние: {current_state}")
-    
-    if current_state is not None:
-        logger.info(f"Игнорируем сообщение в состоянии {current_state} от user {message.from_user.id}")
-        return
+    user_id = message.from_user.id
 
+    # Получаем статус из Firestore
+    status = get_user_status(user_id)
+
+    if status:
+        # Разбор статуса и вызов нужной функции
+        if status.startswith("waiting_proposal_"):
+            # Реалтор ждёт ввода предложения
+            await receive_proposal(message, status)
+            return
+
+        elif status.startswith("some_other_status_"):
+            # В будущем можно добавить другие статусы
+            # await some_other_handler(message, status)
+            return
+
+        # ... добавляй новые elif по мере необходимости ...
+
+    # Если нет активного статуса — обычный поиск
     if message.text.startswith("/"):
         return  # команды не трогаем
     await smart_search(message, message.text, state)

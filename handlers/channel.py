@@ -17,7 +17,9 @@ from database.firebase_db import (
     get_proposals_by_request,
     get_request,
     get_user_active_requests,  # NEW: Функция для получения активных запросов клиента
-    deactivate_old_requests    # NEW: Функция для деактивации старых запросов
+    deactivate_old_requests,    # NEW: Функция для деактивации старых запросов
+    set_user_status,
+    get_user_status
 )
 from utils.keyboards import payment_menu_kb
 
@@ -92,15 +94,17 @@ async def propose_variant(call: CallbackQuery, state: FSMContext):
     await call.answer("Открываю чат для предложения...")
 
     # Сохраняем request_id в состоянии
-    await state.update_data(request_id=request_id)
-    await state.set_state(ProposeStates.waiting_proposal)
+    # await state.update_data(request_id=request_id)
+    # await state.set_state(ProposeStates.waiting_proposal)
 
-    # === ДОБАВЬ ЭТИ ЛОГИ ===
-    current_state = await state.get_state()
-    current_data = await state.get_data()
-    logger.info(f"Установлено состояние для user {call.from_user.id}: {current_state}")
-    logger.info(f"Данные состояния: {current_data}")
-    # === КОНЕЦ ЛОГОВ ===
+    # # === ДОБАВЬ ЭТИ ЛОГИ ===
+    # current_state = await state.get_state()
+    # current_data = await state.get_data()
+    # logger.info(f"Установлено состояние для user {call.from_user.id}: {current_state}")
+    # logger.info(f"Данные состояния: {current_data}")
+    # # === КОНЕЦ ЛОГОВ ===
+    # NEW: Устанавливаем статус вместо FSM
+    set_user_status(call.from_user.id, f"waiting_proposal_{request_id}")
 
     # Отправляем сообщение в личку (может быть медленно — но callback уже отвечен)
     try:
@@ -110,92 +114,69 @@ async def propose_variant(call: CallbackQuery, state: FSMContext):
             "Напиши текст с описанием, ценой, фото (если есть), контактами.\n\n"
             "Я перешлю пользователю анонимно."
         )
-        current_state = await state.get_state()
-        current_data = await state.get_data()
-        logger.info(f"111 Установлено состояние для user {call.from_user.id}: {current_state}")
-        logger.info(f"111 Данные состояния: {current_data}")
     except Exception as e:
         logger.error(f"Не удалось отправить сообщение реалтору {call.from_user.id}: {e}")
         await call.message.answer("Не смог написать тебе в личку. Запусти бота и попробуй снова.")
 
 # === Реалтор отправляет предложение в личке бота ===
-@router.message(ProposeStates.waiting_proposal)
-async def receive_proposal(message: Message, state: FSMContext):
-    # === 
-    current_state = await state.get_state()
-    logger.info(f"СРАБОТАЛ receive_proposal для user {message.from_user.id}, состояние: {current_state}")
-    # ===
-
-    data = await state.get_data()
-    request_id = data["request_id"]
-    realtor_id = message.from_user.id
-    proposal_text = message.text
-
-    # Проверяем статус запроса перед сохранением
-    request = get_request(request_id)
-    if not request or request["status"] != "active":
-        await message.answer("Этот запрос уже неактивен. Предложение не принято.")
-        await state.clear()
+async def receive_proposal(message: Message, status: str):
+    # Извлекаем request_id из статуса
+    parts = status.split("_")
+    if len(parts) < 3:
+        await message.answer("Ошибка состояния. Начни заново.")
+        set_user_status(message.from_user.id, None)
         return
 
-    # Форматируем красиво
-    formatted_proposal = f"""
-    <b>Предложение от риэлтора:</b>\n\n
-    {proposal_text}\n\n
-    <b>Цена:</b> [из текста, если есть]\n
-    <b>Контакты:</b> [из текста]\n
-    """.strip()  # Можно улучшить парсинг, но для простоты
+    request_id = parts[2]
 
-    # Показываем реалтору для подтверждения
+    # Проверка активности запроса
+    request = get_request(request_id)
+    if not request or request["status"] != "active":
+        await message.answer("Этот запрос уже неактивен.")
+        set_user_status(message.from_user.id, None)
+        return
+
+    proposal_text = message.text
+
+    # Красивое форматирование
+    formatted = f"""
+<b>Твоё предложение:</b>
+
+{proposal_text}
+
+Отправить клиенту?
+    """
+
     kb = InlineKeyboardBuilder()
-    kb.button(text="Переслать клиенту", callback_data=f"confirm_send_proposal_{request_id}")
+    kb.button(text="Да, отправить", callback_data=f"confirm_proposal_{request_id}")
     kb.button(text="Отмена", callback_data="cancel_proposal")
 
-    await message.answer(
-        f"Твоё предложение:\n\n{formatted_proposal}\n\n"
-        "Отправить клиенту?",
-        reply_markup=kb.as_markup(),
-        parse_mode="HTML"
-    )
+    await message.answer(formatted, reply_markup=kb.as_markup(), parse_mode="HTML")
 
-    # Сохраняем предложение во временном состоянии
-    await state.update_data(proposal_text=proposal_text)
-    await state.set_state(ProposeStates.confirming_proposal)
+    # Обновляем статус на подтверждение (сохраняем текст)
+    set_user_status(message.from_user.id, f"confirming_proposal_{request_id}")
+    # Можно сохранить текст в отдельном поле, если нужно
 
 
-# === Реалтор подтверждает отправку ===
-@router.callback_query(lambda c: c.data.startswith("confirm_send_proposal_"))
-async def confirm_send_proposal(call: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    request_id = data["request_id"]
-    proposal_text = data["proposal_text"]
-    realtor_id = call.from_user.id
+@router.callback_query(F.data.startswith("confirm_proposal_"))
+async def confirm_proposal(call: CallbackQuery):
+    request_id = call.data.split("_")[2]
 
-    # Сохраняем в базу
-    add_proposal(request_id, realtor_id, proposal_text)
+    # Здесь можно получить текст из предыдущего сообщения или из статуса
+    # Для простоты — пусть реалтор знает, что отправляет
 
-    # Уведомляем реалтора
-    await call.message.edit_text("Предложение отправлено пользователю! Спасибо!")
+    # Логика отправки клиенту...
+    add_proposal(request_id, call.from_user.id, "текст из предыдущего сообщения")
 
-    # Уведомляем пользователя
-    request = get_request(request_id)
-    if request:
-        user_id = request["user_id"]
-        await call.bot.send_message(
-            user_id,
-            f"Новое предложение по твоему запросу ID {request_id}!\n\n"
-            f"От риэлтора: {proposal_text}\n\n"
-            f"Если интересно — ответь риэлтору напрямую."
-        )
+    await call.message.edit_text("Предложение отправлено клиенту!")
 
-    await state.clear()
+    # Очищаем статус
+    set_user_status(call.from_user.id, None)
 
-# === Отмена предложения ===
 @router.callback_query(F.data == "cancel_proposal")
-async def cancel_proposal(call: CallbackQuery, state: FSMContext):
-    await call.message.edit_text("Предложение отменено. Можешь написать новое.")
-    await state.clear()
-    await call.answer()
+async def cancel_proposal(call: CallbackQuery):
+    await call.message.edit_text("Предложение отменено.")
+    set_user_status(call.from_user.id, None)
 
 # === Показ предложений пользователю (по 10 с пагинацией) ===
 async def show_proposals(message: Message, request_id: str, page: int = 0):

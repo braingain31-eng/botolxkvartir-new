@@ -477,3 +477,50 @@ def deactivate_old_requests(user_id: int):
         request_id = req["request_id"]  # теперь безопасно
         db.collection('requests').document(request_id).update({"status": "inactive"})
         logger.info(f"Деактивирован старый запрос ID {request_id} для user {user_id}")
+
+def set_user_status(user_id: int, status: str):
+    """
+    Устанавливает статус для пользователя.
+    Если status = None — удаляет статус.
+    """
+    doc_ref = db.collection('user_statuses').document(str(user_id))
+    if status is None:
+        doc_ref.delete()
+        logger.info(f"Статус для user {user_id} удалён")
+        return
+
+    doc_ref.set({
+        "status": status,
+        "timestamp": datetime.utcnow().isoformat()
+    })
+    logger.info(f"Статус для user {user_id} установлен на {status}")
+
+def get_user_status(user_id: int) -> str or None:
+    """
+    Получает статус, если он активен (не старше 1 часа).
+    Если старше — удаляет и возвращает None.
+    """
+    doc = db.collection('user_statuses').document(str(user_id)).get()
+    if not doc.exists:
+        return None
+
+    data = doc.to_dict()
+    timestamp_str = data.get("timestamp")
+    status = data.get("status")
+
+    if not timestamp_str:
+        doc.reference.delete()
+        return None
+
+    try:
+        timestamp = datetime.fromisoformat(timestamp_str)
+        now = datetime.utcnow()
+        if (now - timestamp) > timedelta(hours=1):
+            doc.reference.delete()
+            logger.info(f"Статус для user {user_id} истёк и удалён")
+            return None
+        return status
+    except Exception as e:
+        logger.error(f"Ошибка при проверке статуса user {user_id}: {e}")
+        doc.reference.delete()
+        return None
