@@ -68,6 +68,9 @@ async def voice_search(message: Message, state: FSMContext):
 # === Текстовый ввод ===
 @router.message(F.text, StateFilter(None))
 async def text_search(message: Message, state: FSMContext):
+    current_state = await state.get_state()
+    logger.info(f"text_search сработал для user {message.from_user.id}, состояние: {current_state}")
+    
     if message.text.startswith("/"):
         return  # команды не трогаем
     await smart_search(message, message.text, state)
