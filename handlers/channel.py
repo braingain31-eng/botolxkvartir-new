@@ -151,7 +151,12 @@ async def receive_proposal(message: Message, status: str):
     kb.button(text="Да, отправить", callback_data=f"confirm_proposal_{request_id}")
     kb.button(text="Отмена", callback_data="cancel_proposal")
 
-    await message.answer(formatted, reply_markup=kb.as_markup(), parse_mode="HTML")
+    await message.answer(
+        formatted,
+        reply_markup=kb.as_markup(),
+        parse_mode="HTML",
+        reply_to_message_id=message.message_id  # ← КЛЮЧЕВОЕ: чтобы в confirm был reply_to_message
+    )
 
     # Обновляем статус на подтверждение (сохраняем текст)
     set_user_status(message.from_user.id, f"confirming_proposal_{request_id}")
@@ -160,7 +165,6 @@ async def receive_proposal(message: Message, status: str):
 
 @router.callback_query(F.data.startswith("confirm_proposal_"))
 async def confirm_proposal(call: CallbackQuery):
-    # Извлекаем request_id из callback_data: confirm_proposal_{request_id}
     try:
         request_id = call.data.split("_")[2]
     except IndexError:
@@ -169,48 +173,48 @@ async def confirm_proposal(call: CallbackQuery):
 
     realtor_id = call.from_user.id
 
-    # Получаем текст предложения из предыдущего сообщения (реалтор нажимает кнопку под своим текстом)
+    # Основной способ: текст из reply_to_message (реалтор нажал кнопку под своим текстом)
     if call.message.reply_to_message and call.message.reply_to_message.from_user.id == realtor_id:
-        proposal_text = call.message.reply_to_message.text or call.message.reply_to_message.caption or "Предложение без текста"
+        proposal_text = call.message.reply_to_message.text or "Без текста"
     else:
         await call.answer("Не удалось найти текст предложения", show_alert=True)
-        return
-
-    # Проверяем, активен ли запрос (дополнительная защита)
-    request = get_request(request_id)
-    if not request or request["status"] != "active":
-        await call.answer("Этот запрос уже неактивен", show_alert=True)
         set_user_status(realtor_id, None)
         return
 
-    # Сохраняем предложение в базу
+    # Проверка активности (ещё раз)
+    request = get_request(request_id)
+    if not request or request["status"] != "active":
+        await call.answer("Запрос уже неактивен", show_alert=True)
+        set_user_status(realtor_id, None)
+        return
+
+    # Сохраняем в базу
     add_proposal(request_id, realtor_id, proposal_text)
 
     # Уведомляем реалтора
     await call.message.edit_text("✅ Предложение успешно отправлено клиенту!")
 
     # Уведомляем клиента
-    client_user_id = request["user_id"]
+    client_id = request["user_id"]
     try:
         await call.bot.send_message(
-            client_user_id,
+            client_id,
             f"Новое предложение по твоему запросу!\n\n"
             f"{proposal_text}\n\n"
-            f"Если интересно — свяжись с риэлтором через канал @goa_realt"
+            f"Если интересно — пиши риэлтору в канал @goa_realt"
         )
     except Exception as e:
-        logger.error(f"Не удалось отправить клиенту {client_user_id}: {e}")
-        await call.message.answer("Предложение сохранено, но не удалось отправить клиенту (возможно, он заблокировал бота)")
+        logger.error(f"Не удалось уведомить клиента {client_id}: {e}")
 
-    # Очищаем статус реалтора
+    # Очищаем статус
     set_user_status(realtor_id, None)
-
     await call.answer()
 
 @router.callback_query(F.data == "cancel_proposal")
 async def cancel_proposal(call: CallbackQuery):
-    await call.message.edit_text("Предложение отменено.")
+    await call.message.edit_text("❌ Предложение отменено.")
     set_user_status(call.from_user.id, None)
+    await call.answer()
 
 # === Показ предложений пользователю (по 10 с пагинацией) ===
 async def show_proposals(message: Message, request_id: str, page: int = 0):
