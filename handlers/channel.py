@@ -41,32 +41,37 @@ async def send_request_to_channel(call: CallbackQuery, state: FSMContext):
     # Создаём новый запрос в базе
     request_id = create_request(user_id, user_query)
 
-    # Публикуем в канал
-    channel_msg = await call.bot.send_message(
-        chat_id="@goa_realt",
-        text=f"Новый запрос (ID: {request_id})\n\n"
-             f"Запрос: {user_query}\n\n"
-             f"Реалторы, предлагайте варианты!"
-    )
+    # ОТВЕЧАЕМ НА CALLBACK СРАЗУ — обязательно первым!
+    await call.answer("Запрос отправляется в канал...")
 
-    # Кнопка "Предложить вариант"
-    kb = InlineKeyboardBuilder()
-    kb.button(text="Предложить вариант", callback_data=f"propose_{request_id}")
-    await call.bot.edit_message_reply_markup(
-        chat_id="@goa_realt",
-        message_id=channel_msg.message_id,
-        reply_markup=kb.as_markup()
-    )
+    try:
+        # Публикуем в канал
+        channel_msg = await call.bot.send_message(
+            chat_id="@goa_realt",
+            text=f"Новый запрос (ID: {request_id})\n\n"
+                 f"Запрос: {user_query}\n\n"
+                 f"Реалторы, предлагайте варианты!"
+        )
 
-    # Ссылка на пост
-    # post_link = f"https://t.me/goa_realt/{channel_msg.message_id}"
+        # Добавляем кнопку
+        kb = InlineKeyboardBuilder()
+        kb.button(text="Предложить вариант", callback_data=f"propose_{request_id}")
+        await call.bot.edit_message_reply_markup(
+            chat_id="@goa_realt",
+            message_id=channel_msg.message_id,
+            reply_markup=kb.as_markup()
+        )
 
-    await call.message.answer(
-        f"Твой запрос отправлен в канал @goa_realt!\n\n"
-        f"ID запроса: {request_id}\n\n"
-        f"Как только реалторы предложат варианты — я пришлю их тебе по 10 штук с кнопкой 'Показать ещё'."
-    )
-    await call.answer("Запрос отправлен!")
+        post_link = f"https://t.me/goa_realt/{channel_msg.message_id}"
+
+        await call.message.answer(
+            f"Твой запрос отправлен в канал @goa_realt!\n\n"
+            f"ID запроса: {request_id}\n\n"
+            f"Предложения от реалторов придут тебе в личку по 10 штук."
+        )
+    except Exception as e:
+        logger.error(f"Ошибка при отправке в канал: {e}")
+        await call.message.answer("Не удалось опубликовать запрос в канал. Попробуй позже.")
 
 
 # === Реалтор нажимает "Предложить вариант" в канале ===
