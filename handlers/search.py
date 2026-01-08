@@ -10,6 +10,7 @@ from utils.voice_to_text import voice_to_text
 from utils.keyboards import payment_menu_kb 
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
+from aiogram.filters.state import StateFilter
 from typing import Optional
 
 import os
@@ -65,7 +66,7 @@ async def voice_search(message: Message, state: FSMContext):
 
 
 # === Текстовый ввод ===
-@router.message(F.text)
+@router.message(F.text, StateFilter(default_state))
 async def text_search(message: Message, state: FSMContext):
     if message.text.startswith("/"):
         return  # команды не трогаем
