@@ -160,18 +160,52 @@ async def receive_proposal(message: Message, status: str):
 
 @router.callback_query(F.data.startswith("confirm_proposal_"))
 async def confirm_proposal(call: CallbackQuery):
-    request_id = call.data.split("_")[2]
+    # Извлекаем request_id из callback_data: confirm_proposal_{request_id}
+    try:
+        request_id = call.data.split("_")[2]
+    except IndexError:
+        await call.answer("Ошибка данных", show_alert=True)
+        return
 
-    # Здесь можно получить текст из предыдущего сообщения или из статуса
-    # Для простоты — пусть реалтор знает, что отправляет
+    realtor_id = call.from_user.id
 
-    # Логика отправки клиенту...
-    add_proposal(request_id, call.from_user.id, "текст из предыдущего сообщения")
+    # Получаем текст предложения из предыдущего сообщения (реалтор нажимает кнопку под своим текстом)
+    if call.message.reply_to_message and call.message.reply_to_message.from_user.id == realtor_id:
+        proposal_text = call.message.reply_to_message.text or call.message.reply_to_message.caption or "Предложение без текста"
+    else:
+        await call.answer("Не удалось найти текст предложения", show_alert=True)
+        return
 
-    await call.message.edit_text("Предложение отправлено клиенту!")
+    # Проверяем, активен ли запрос (дополнительная защита)
+    request = get_request(request_id)
+    if not request or request["status"] != "active":
+        await call.answer("Этот запрос уже неактивен", show_alert=True)
+        set_user_status(realtor_id, None)
+        return
 
-    # Очищаем статус
-    set_user_status(call.from_user.id, None)
+    # Сохраняем предложение в базу
+    add_proposal(request_id, realtor_id, proposal_text)
+
+    # Уведомляем реалтора
+    await call.message.edit_text("✅ Предложение успешно отправлено клиенту!")
+
+    # Уведомляем клиента
+    client_user_id = request["user_id"]
+    try:
+        await call.bot.send_message(
+            client_user_id,
+            f"Новое предложение по твоему запросу!\n\n"
+            f"{proposal_text}\n\n"
+            f"Если интересно — свяжись с риэлтором через канал @goa_realt"
+        )
+    except Exception as e:
+        logger.error(f"Не удалось отправить клиенту {client_user_id}: {e}")
+        await call.message.answer("Предложение сохранено, но не удалось отправить клиенту (возможно, он заблокировал бота)")
+
+    # Очищаем статус реалтора
+    set_user_status(realtor_id, None)
+
+    await call.answer()
 
 @router.callback_query(F.data == "cancel_proposal")
 async def cancel_proposal(call: CallbackQuery):
