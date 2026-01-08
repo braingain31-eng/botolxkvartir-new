@@ -44,10 +44,9 @@ dp.include_router(start.router)
 dp.include_router(payment.router)
 dp.include_router(agent.router)
 dp.include_router(channel_router)
-dp.include_router(errors.router)
 dp.include_router(property_router)
 dp.include_router(search.router)
-
+dp.include_router(errors.router)
 # --- URL Вебхука ---
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{config.WEBHOOK_BASE_URL}{WEBHOOK_PATH}"

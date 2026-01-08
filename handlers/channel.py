@@ -92,6 +92,13 @@ async def propose_variant(call: CallbackQuery, state: FSMContext):
     await state.update_data(request_id=request_id)
     await state.set_state(ProposeStates.waiting_proposal)
 
+    # === ДОБАВЬ ЭТИ ЛОГИ ===
+    current_state = await state.get_state()
+    current_data = await state.get_data()
+    logger.info(f"Установлено состояние для user {call.from_user.id}: {current_state}")
+    logger.info(f"Данные состояния: {current_data}")
+    # === КОНЕЦ ЛОГОВ ===
+
     # Отправляем сообщение в личку (может быть медленно — но callback уже отвечен)
     try:
         await call.bot.send_message(
@@ -107,6 +114,11 @@ async def propose_variant(call: CallbackQuery, state: FSMContext):
 # === Реалтор отправляет предложение в личке бота ===
 @router.message(ProposeStates.waiting_proposal)
 async def receive_proposal(message: Message, state: FSMContext):
+    # === 
+    current_state = await state.get_state()
+    logger.info(f"СРАБОТАЛ receive_proposal для user {message.from_user.id}, состояние: {current_state}")
+    # ===
+
     data = await state.get_data()
     request_id = data["request_id"]
     realtor_id = message.from_user.id

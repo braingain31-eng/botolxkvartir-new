@@ -34,7 +34,7 @@ NORTH_GOA_DEFAULT_AREAS = [
 
 
 # === Голосовой ввод ===
-@router.message(F.voice)
+@router.message(F.voice, StateFilter(None))
 async def voice_search(message: Message, state: FSMContext):
     user_id = message.from_user.id
 
