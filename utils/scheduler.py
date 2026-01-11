@@ -1,5 +1,6 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from utils.olx_parser import parse_olx_listing
+from utils.telegram_parser import parse_telegram_channels
 from database.firebase_db import get_properties
 from datetime import datetime, timedelta
 import asyncio
@@ -38,10 +39,15 @@ async def run_olx_parser_now():
                 except Exception as e:
                     logger.warning(f"Ошибка парсинга даты parsed_at: {e} → запускаем парсинг на всякий случай")
 
-        # Если дошли сюда — парсим
-        logger.info("Начинаем парсинг OLX...")
-        added = await parse_olx_listing()
-        logger.info(f"Парсинг завершён. Добавлено новых: {added}")
+        # NEW: Парсинг Telegram-каналов
+        logger.info("Начинаем парсинг Telegram-каналов...")
+        tg_added = await parse_telegram_channels()
+        logger.info(f"Telegram-парсинг завершён. Добавлено новых: {tg_added}")
+
+        # # Если дошли сюда — парсим
+        # logger.info("Начинаем парсинг OLX...")
+        # added = await parse_olx_listing()
+        # logger.info(f"Парсинг завершён. Добавлено новых: {added}")
 
     except Exception as e:
         logger.error(f"Критическая ошибка в run_olx_parser_now: {e}", exc_info=True)
