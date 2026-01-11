@@ -3,6 +3,7 @@
 import logging
 import asyncio
 import os
+import uuid
 from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
@@ -39,16 +40,19 @@ async def parse_telegram_channels():
     Парсит указанные каналы, ищет объявления аренды в северных районах Гоа.
     Сохраняет в Firestore через create_property.
     """
-    # Используем Bot Token — самый простой способ в 2026 году
-    client = TelegramClient('session_telegram_parser', api_id=config.API_ID, api_hash=config.API_HASH)
+    # Уникальный ID воркера (Gunicorn workers имеют разные PID, но используем uuid для надёжности)
+    worker_id = os.getenv('GUNICORN_WORKER_ID', str(uuid.uuid4())[:8])
+    session_name = f'session_telegram_parser_{worker_id}'
+
+    client = TelegramClient(session_name, config.API_ID, config.API_HASH)
 
     async with client:
         try:
             # Авторизация через Bot Token — не требует номера телефона!
             await client.start(bot_token=config.TELEGRAM_BOT_TOKEN)
-            logger.info("Telethon клиент успешно авторизован через Bot Token")
+            logger.info(f"Telethon клиент авторизован через Bot Token (воркер {worker_id})")
         except Exception as e:
-            logger.error(f"Ошибка авторизации Telethon: {e}")
+            logger.error(f"Ошибка авторизации (воркер {worker_id}): {e}")
             raise
 
         total_added = 0
