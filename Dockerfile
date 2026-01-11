@@ -18,6 +18,7 @@ RUN python -c "from faster_whisper import WhisperModel; \
 
 # Копируем код
 COPY . .
+COPY session_telegram_parser* /app/
 
 # Run the web server on container startup.
 # Use gunicorn for production.
