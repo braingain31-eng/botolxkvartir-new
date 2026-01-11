@@ -40,6 +40,8 @@ CRYPTO_WALLETS = {
 }
 
 # Обязательно через os.getenv — Cloud Run передаёт только так
+API_ID = os.getenv("API_ID")
+API_HASH = os.getenv("API_HASH")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROK_API_KEY = os.getenv("GROK_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")

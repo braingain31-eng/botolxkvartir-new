@@ -40,7 +40,7 @@ async def parse_telegram_channels():
     Сохраняет в Firestore через create_property.
     """
     # Используем Bot Token — самый простой способ в 2026 году
-    client = TelegramClient('session_telegram_parser', api_id=None, api_hash=None)
+    client = TelegramClient('session_telegram_parser', api_id=config.API_ID, api_hash=config.API_HASH)
 
     async with client:
         try:
