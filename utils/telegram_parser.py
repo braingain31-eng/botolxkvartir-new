@@ -8,38 +8,50 @@ from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 from datetime import datetime
 from database.firebase_db import create_property
 import config  # API_ID, API_HASH из конфига
-import ssl
 import re
 import time
+import os
 
 logger = logging.getLogger(__name__)
 
-# Список каналов
+# Создаём папку для медиа
+os.makedirs("media/photos", exist_ok=True)
+os.makedirs("media/videos", exist_ok=True)
+
+# Список каналов (username без @)
 CHANNELS = ['goahouses', 'goaPeople2019', 'goa_appart', 'myflats']
 
-# Ключевые слова для фильтра аренды (расширь по необходимости)
-RENT_KEYWORDS = ['аренда', 'rent', 'house', 'villa', 'apartment', 'бунгало', 'flat', 'room', 'сдам', 'сдаю', 'for rent', 'available', 'аренду']
+# Ключевые слова для фильтра аренды
+RENT_KEYWORDS = [
+    'аренда', 'rent', 'house', 'villa', 'apartment', 'бунгало', 'flat', 'room',
+    'сдам', 'сдаю', 'for rent', 'available', 'аренду', 'long term', 'short term'
+]
 
-# Список северных районов Гоа для фильтрации
+# Районы для фильтрации
 NORTH_GOA_AREAS = [
     "Arambol", "Arambol Beach", "Aswem", "Ashwem", "Mandrem", "Morjim",
     "Kerim", "Keri", "Korgaon", "Siolim", "Chapora", "Vagator", "Anjuna",
-    "Assagao", "Arpora", "Baga", "Calangute", "Candolim", "Agarwado", "Pilerne", "Palolem", "Agonda"
+    "Assagao", "Arpora", "Baga", "Calangute", "Candolim", "Agarwado", "Pilerne"
 ]
 
 async def parse_telegram_channels():
     """
-    Парсит Telegram-каналы на объявления аренды в северных районах Гоа.
+    Парсит указанные каналы, ищет объявления аренды в северных районах Гоа.
+    Сохраняет в Firestore через create_property.
     """
-    client = TelegramClient('session', config.API_ID, config.API_HASH)
+    client = TelegramClient('session', api_id=None, api_hash=None)
 
     async with client:
         try:
-            await client.start()
+            await client.start(bot_token=config.TELEGRAM_BOT_TOKEN)
+            logger.info("Telethon клиент успешно авторизован")
         except SessionPasswordNeededError:
-            await client.sign_in(password=input("Введите 2FA-пароль: "))
+            logger.warning("Требуется 2FA-пароль")
+            password = input("Введите 2FA-пароль: ")
+            await client.sign_in(password=password)
 
         total_added = 0
+
         for channel_username in CHANNELS:
             logger.info(f"Парсим канал: @{channel_username}")
 
@@ -49,64 +61,76 @@ async def parse_telegram_channels():
                 logger.error(f"Не удалось получить канал @{channel_username}: {e}")
                 continue
 
-            async for msg in client.iter_messages(channel, limit=100):  # Последние 100 сообщений
+            async for msg in client.iter_messages(channel, limit=100):
                 if not msg.text:
                     continue
 
+                text_lower = msg.text.lower()
+
                 # Фильтр по ключевым словам аренды
-                if not any(word.lower() in msg.text.lower() for word in RENT_KEYWORDS):
+                if not any(word in text_lower for word in RENT_KEYWORDS):
                     continue
 
-                # Фильтр по районам (проверяем наличие хотя бы одного района в тексте)
-                normalized_text = msg.text.lower().strip()
-                area_match = next((area for area in NORTH_GOA_AREAS if area.lower() in normalized_text), None)
+                # Фильтр по районам
+                area_match = next((area for area in NORTH_GOA_AREAS if area.lower() in text_lower), None)
                 if not area_match:
                     continue
 
-                # Проверяем наличие фото или видео
-                photo_url = None
+                # Проверяем наличие медиа
+                media_url = None
+                media_type = None
+
                 if msg.photo:
-                    photo = msg.photo.sizes[-1]  # Самое большое фото
-                    photo_url = await client.download_media(msg.photo, file=f"photos/{msg.id}.jpg")  # Скачиваем локально, можно загрузить в Firebase Storage
-
+                    media_url = await client.download_media(msg.photo, file=f"media/photos/{msg.id}.jpg")
+                    media_type = "photo"
                 elif msg.video:
-                    # Для видео — скачиваем или берём URL
-                    photo_url = await client.download_media(msg.video, file=f"videos/{msg.id}.mp4")
+                    media_url = await client.download_media(msg.video, file=f"media/videos/{msg.id}.mp4")
+                    media_type = "video"
 
-                if not photo_url:
+                if not media_url:
                     continue  # Пропускаем без медиа
 
-                # Формируем данные для базы
+                # Извлекаем цену (адаптировано из твоего OLX-парсера)
+                price = extract_price(msg.text)
+
+                # Формируем объект для базы
                 ad = {
-                    'title': msg.text[:100] + "..." if len(msg.text) > 100 else msg.text,  # Короткий заголовок
+                    'title': (msg.text[:100] + "...") if len(msg.text) > 100 else msg.text,
                     'description': msg.text,
                     'area': area_match,
-                    'price_day_inr': extract_price(msg.text),  # Твоя функция извлечения цены (из OLX, адаптируй)
-                    'photos': [photo_url],
+                    'price_day_inr': price,
+                    'photos': [str(media_url)] if media_url else [],
                     'source': f"t.me/{channel_username}",
+                    'source_type': 'telegram',
+                    'message_id': msg.id,
                     'created_at': msg.date.isoformat(),
-                    'parsed_at': datetime.utcnow().isoformat(),
-                    'id': str(msg.id)  # ID сообщения как уникальный ID
+                    'parsed_at': datetime.utcnow().isoformat()
                 }
 
                 # Сохраняем в базу
                 create_property(ad)
                 total_added += 1
-                logger.info(f"Добавлено из @{channel_username}: {ad['title']} ({ad['area']})")
+                logger.info(f"Добавлено из @{channel_username}: {ad['title']} ({ad['area']}) — {price} ₹")
 
             time.sleep(5)  # Пауза между каналами
 
-    logger.info(f"Парсинг завершён. Добавлено {total_added} новых объектов")
-    return total_added
+        logger.info(f"Парсинг завершён. Добавлено {total_added} новых объектов")
+        return total_added
 
-# Адаптированная функция извлечения цены из текста (из твоего OLX-кода)
 def extract_price(text: str) -> int:
-    price_match = re.search(r'₹\s*([\d,]+)', text)
+    """Извлекает цену в рупиях из текста"""
+    price_match = re.search(r'(?:₹|Rs\.?|Rupees?)\s*([\d,]+)', text, re.IGNORECASE)
     if price_match:
         price_str = price_match.group(1).replace(',', '')
         return int(price_str)
-    return 0
+    
+    # Альтернатива: просто цифры рядом с "per day" или "daily"
+    price_match = re.search(r'(\d{3,6})\s*(?:per day|daily|night|сутки|день)', text, re.IGNORECASE)
+    if price_match:
+        return int(price_match.group(1))
+    
+    return 0  # Нет цены — 0
 
-# Запуск парсера
+# Запуск парсера (для теста локально)
 if __name__ == '__main__':
     asyncio.run(parse_telegram_channels())
