@@ -2,26 +2,26 @@
 
 import logging
 import asyncio
+import os
 from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 from datetime import datetime
 from database.firebase_db import create_property
-import config  # API_ID, API_HASH из конфига
+import config  # TELEGRAM_BOT_TOKEN, другие настройки
 import re
 import time
-import os
 
 logger = logging.getLogger(__name__)
 
-# Создаём папку для медиа
+# Создаём папки для медиа (если не существуют)
 os.makedirs("media/photos", exist_ok=True)
 os.makedirs("media/videos", exist_ok=True)
 
 # Список каналов (username без @)
 CHANNELS = ['goahouses', 'goaPeople2019', 'goa_appart', 'myflats']
 
-# Ключевые слова для фильтра аренды
+# Ключевые слова для фильтра аренды (расширь при необходимости)
 RENT_KEYWORDS = [
     'аренда', 'rent', 'house', 'villa', 'apartment', 'бунгало', 'flat', 'room',
     'сдам', 'сдаю', 'for rent', 'available', 'аренду', 'long term', 'short term'
@@ -39,16 +39,17 @@ async def parse_telegram_channels():
     Парсит указанные каналы, ищет объявления аренды в северных районах Гоа.
     Сохраняет в Firestore через create_property.
     """
-    client = TelegramClient('session', api_id=None, api_hash=None)
+    # Используем Bot Token — самый простой способ в 2026 году
+    client = TelegramClient('session_telegram_parser', api_id=None, api_hash=None)
 
     async with client:
         try:
+            # Авторизация через Bot Token — не требует номера телефона!
             await client.start(bot_token=config.TELEGRAM_BOT_TOKEN)
-            logger.info("Telethon клиент успешно авторизован")
-        except SessionPasswordNeededError:
-            logger.warning("Требуется 2FA-пароль")
-            password = input("Введите 2FA-пароль: ")
-            await client.sign_in(password=password)
+            logger.info("Telethon клиент успешно авторизован через Bot Token")
+        except Exception as e:
+            logger.error(f"Ошибка авторизации Telethon: {e}")
+            raise
 
         total_added = 0
 
@@ -56,11 +57,13 @@ async def parse_telegram_channels():
             logger.info(f"Парсим канал: @{channel_username}")
 
             try:
+                # Получаем entity канала
                 channel = await client.get_entity(channel_username)
             except Exception as e:
                 logger.error(f"Не удалось получить канал @{channel_username}: {e}")
                 continue
 
+            # Берём последние 100 сообщений (можно увеличить до 200–500)
             async for msg in client.iter_messages(channel, limit=100):
                 if not msg.text:
                     continue
@@ -76,21 +79,27 @@ async def parse_telegram_channels():
                 if not area_match:
                     continue
 
-                # Проверяем наличие медиа
+                # Проверяем наличие медиа (фото или видео)
                 media_url = None
                 media_type = None
 
                 if msg.photo:
-                    media_url = await client.download_media(msg.photo, file=f"media/photos/{msg.id}.jpg")
                     media_type = "photo"
+                    media_url = await client.download_media(
+                        msg.photo,
+                        file=f"media/photos/{msg.id}.jpg"
+                    )
                 elif msg.video:
-                    media_url = await client.download_media(msg.video, file=f"media/videos/{msg.id}.mp4")
                     media_type = "video"
+                    media_url = await client.download_media(
+                        msg.video,
+                        file=f"media/videos/{msg.id}.mp4"
+                    )
 
                 if not media_url:
                     continue  # Пропускаем без медиа
 
-                # Извлекаем цену (адаптировано из твоего OLX-парсера)
+                # Извлечение цены (адаптировано из OLX-парсера)
                 price = extract_price(msg.text)
 
                 # Формируем объект для базы
@@ -117,19 +126,21 @@ async def parse_telegram_channels():
         logger.info(f"Парсинг завершён. Добавлено {total_added} новых объектов")
         return total_added
 
+
 def extract_price(text: str) -> int:
     """Извлекает цену в рупиях из текста"""
     price_match = re.search(r'(?:₹|Rs\.?|Rupees?)\s*([\d,]+)', text, re.IGNORECASE)
     if price_match:
         price_str = price_match.group(1).replace(',', '')
         return int(price_str)
-    
+
     # Альтернатива: просто цифры рядом с "per day" или "daily"
     price_match = re.search(r'(\d{3,6})\s*(?:per day|daily|night|сутки|день)', text, re.IGNORECASE)
     if price_match:
         return int(price_match.group(1))
-    
+
     return 0  # Нет цены — 0
+
 
 # Запуск парсера (для теста локально)
 if __name__ == '__main__':
