@@ -9,6 +9,7 @@ from telethon.errors import SessionPasswordNeededError
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 from datetime import datetime
 from database.firebase_db import create_property
+from utils.firestore_session import FirestoreSession
 import config  # TELEGRAM_BOT_TOKEN, другие настройки
 import re
 import time
@@ -43,15 +44,15 @@ async def parse_telegram_channels():
 # Уникальный ID воркера для сессии
     # worker_id = os.getenv('GUNICORN_WORKER_ID', str(uuid.uuid4())[:8])
     # session_name = f'session_telegram_parser_{worker_id}'
-    session_name = 'session_telegram_parser'
+    session_name = FirestoreSession(session_name='telegram_parser')
 
-    # === ЛОГИ СЕССИИ ===
-    session_path = f"{session_name}.session"
-    logger.info(f"Попытка загрузки сессии: {session_path}")
-    if os.path.exists(session_path):
-        logger.info(f"Файл сессии найден: {os.path.getsize(session_path)} байт")
-    else:
-        logger.warning(f"Файл сессии НЕ НАЙДЕН: {session_path} — будет создана новая сессия")
+    # # === ЛОГИ СЕССИИ ===
+    # session_path = f"{session_name}.session"
+    # logger.info(f"Попытка загрузки сессии: {session_path}")
+    # if os.path.exists(session_path):
+    #     logger.info(f"Файл сессии найден: {os.path.getsize(session_path)} байт")
+    # else:
+    #     logger.warning(f"Файл сессии НЕ НАЙДЕН: {session_path} — будет создана новая сессия")
     # === КОНЕЦ ЛОГОВ СЕССИИ ===
 
     client = TelegramClient(session_name, config.API_ID, config.API_HASH)
