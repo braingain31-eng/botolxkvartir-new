@@ -41,8 +41,9 @@ async def parse_telegram_channels():
     Сохраняет в Firestore через create_property.
     """
 # Уникальный ID воркера для сессии
-    worker_id = os.getenv('GUNICORN_WORKER_ID', str(uuid.uuid4())[:8])
-    session_name = f'session_telegram_parser_{worker_id}'
+    # worker_id = os.getenv('GUNICORN_WORKER_ID', str(uuid.uuid4())[:8])
+    # session_name = f'session_telegram_parser_{worker_id}'
+    session_name = 'session_telegram_parser'
 
     # === ЛОГИ СЕССИИ ===
     session_path = f"{session_name}.session"

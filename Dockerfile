@@ -21,7 +21,8 @@ RUN python -c "from faster_whisper import WhisperModel; \
 COPY . .
 
 # Copy Telethon session (after local authorization)
-COPY session_telegram_parser* /app/
+COPY session_telegram_parser.session /app/
+COPY session_telegram_parser.session-journal /app/
 
 # Gunicorn settings (переопределяй в Cloud Run через env vars)
 ENV GUNICORN_CMD_ARGS "--workers=2 --threads=4 --timeout=120 --keep-alive=75"
