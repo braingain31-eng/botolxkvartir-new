@@ -53,7 +53,7 @@ async def parse_telegram_channels():
         logger.warning(f"Файл сессии НЕ НАЙДЕН: {session_path} — будет создана новая сессия")
     # === КОНЕЦ ЛОГОВ СЕССИИ ===
 
-    client = TelegramClient(session_name, config.TELEGRAM_API_ID, config.TELEGRAM_API_HASH)
+    client = TelegramClient(session_name, config.API_ID, config.API_HASH)
 
     async with client:
         try:
