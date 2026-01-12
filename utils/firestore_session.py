@@ -1,5 +1,6 @@
-from telethon.sessions import StringSession
-from telethon.sessions.base import Session
+# utils/firestore_session.py — Хранение сессии Telethon в Firestore (исправленная 2026 версия)
+
+from telethon.sessions import MemorySession  # ← БАЗОВЫЙ КЛАСС (без строки)
 from database.firebase_db import db
 import pickle
 import base64
@@ -7,13 +8,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class FirestoreSession(Session):
+class FirestoreSession(MemorySession):
     """
-    Хранит сессию Telethon в Firestore.
+    Кастомное хранилище сессии Telethon в Firestore.
     Документ: sessions/telegram_parser
     """
     def __init__(self, session_name='telegram_parser'):
-        super().__init__(session_name)
+        super().__init__()
+        self.session_name = session_name
         self._doc_ref = db.collection('sessions').document(session_name)
         self._load()
 
@@ -33,11 +35,11 @@ class FirestoreSession(Session):
                     self._auth_key = loaded.get('auth_key')
                     self._user_id = loaded.get('user_id')
                     self._takeout_id = loaded.get('takeout_id')
-                    logger.info(f"Сессия успешно загружена из Firestore: {self._session_name}")
+                    logger.info(f"Сессия успешно загружена из Firestore: {self.session_name}")
                 except Exception as e:
                     logger.error(f"Ошибка загрузки сессии из Firestore: {e}")
         else:
-            logger.info(f"Новая сессия будет создана: {self._session_name}")
+            logger.info(f"Новая сессия будет создана в Firestore: {self.session_name}")
 
     def save(self):
         """Сохраняет сессию в Firestore"""
@@ -51,9 +53,9 @@ class FirestoreSession(Session):
         }
         serialized = base64.b64encode(pickle.dumps(data)).decode('utf-8')
         self._doc_ref.set({'data': serialized})
-        logger.info(f"Сессия сохранена в Firestore: {self._session_name}")
+        logger.info(f"Сессия сохранена в Firestore: {self.session_name}")
 
     def delete(self):
-        """Удаляет сессию"""
+        """Удаляет сессию из Firestore"""
         self._doc_ref.delete()
-        logger.info(f"Сессия удалена из Firestore: {self._session_name}")
+        logger.info(f"Сессия удалена из Firestore: {self.session_name}")

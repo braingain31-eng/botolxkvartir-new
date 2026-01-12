@@ -49,7 +49,8 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 WEBHOOK_BASE_URL = os.getenv("WEBHOOK_BASE_URL")
 FIREBASE_CREDENTIALS_PATH = os.getenv("FIREBASE_CREDENTIALS_PATH", "/etc/secrets/firebase.json")
-
+# FIREBASE_CREDENTIALS_PATH = "/home/user/botolxkvartir/botolxkvartir-firebase-adminsdk-fbsvc-63c5cc654e.json"
 # # Учетные данные Oxylabs (теперь из переменных окружения)
 # OXYLABS_USERNAME = os.getenv("OXYLABS_USERNAME")
 # OXYLABS_PASSWORD = os.getenv("OXYLABS_PASSWORD")
+

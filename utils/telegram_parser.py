@@ -44,6 +44,7 @@ async def parse_telegram_channels():
 # Уникальный ID воркера для сессии
     # worker_id = os.getenv('GUNICORN_WORKER_ID', str(uuid.uuid4())[:8])
     # session_name = f'session_telegram_parser_{worker_id}'
+    logger.info(f"Старт -----  ")
     session_name = FirestoreSession(session_name='telegram_parser')
 
     # # === ЛОГИ СЕССИИ ===

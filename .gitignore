@@ -90,3 +90,4 @@ botolxkvartir-firebase-adminsdk-fbsvc-63c5cc654e.json
 logs/
 cached_photos/
 temp/
+etc/secrets/firebase.json
