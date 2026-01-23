@@ -10,15 +10,17 @@ from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 from datetime import datetime
 from database.firebase_db import create_property
 from utils.firestore_session import FirestoreSession
+from firebase_admin import storage
 import config  # TELEGRAM_BOT_TOKEN, другие настройки
 import re
 import time
 
+
 logger = logging.getLogger(__name__)
 
 # Создаём папки для медиа (если не существуют)
-os.makedirs("media/photos", exist_ok=True)
-os.makedirs("media/videos", exist_ok=True)
+TEMP_MEDIA_DIR = "temp_media"
+os.makedirs(TEMP_MEDIA_DIR, exist_ok=True)
 
 # Список каналов (username без @)
 CHANNELS = ['goahouses', 'goaPeople2019', 'goa_appart', 'myflats']
@@ -41,7 +43,7 @@ async def parse_telegram_channels():
     Парсит указанные каналы, ищет объявления аренды в северных районах Гоа.
     Сохраняет в Firestore через create_property.
     """
-# Уникальный ID воркера для сессии
+    # Уникальный ID воркера для сессии
     # worker_id = os.getenv('GUNICORN_WORKER_ID', str(uuid.uuid4())[:8])
     # session_name = f'session_telegram_parser_{worker_id}'
     logger.info(f"Старт -----  ")
@@ -103,18 +105,13 @@ async def parse_telegram_channels():
                 media_url = None
                 media_type = None
 
-                if msg.photo:
-                    media_type = "photo"
-                    media_url = await client.download_media(
-                        msg.photo,
-                        file=f"media/photos/{msg.id}.jpg"
-                    )
-                elif msg.video:
-                    media_type = "video"
-                    media_url = await client.download_media(
-                        msg.video,
-                        file=f"media/videos/{msg.id}.mp4"
-                    )
+                if msg.photo or msg.video:
+                    file_path = await client.download_media(msg, file=f"{TEMP_MEDIA_DIR}/{msg.id}")
+                    if file_path:
+                        # Загружаем в Storage
+                        media_url = await upload_to_storage(file_path, msg.id)
+                        # Удаляем временный файл
+                        os.remove(file_path)    
 
                 if not media_url:
                     continue  # Пропускаем без медиа
@@ -128,7 +125,7 @@ async def parse_telegram_channels():
                     'description': msg.text,
                     'area': area_match,
                     'price_day_inr': price,
-                    'photos': [str(media_url)] if media_url else [],
+                    'photos': [media_url] if media_url else [],
                     'source': f"t.me/{channel_username}",
                     'source_type': 'telegram',
                     'message_id': msg.id,
@@ -145,6 +142,24 @@ async def parse_telegram_channels():
 
         logger.info(f"Парсинг завершён. Добавлено {total_added} новых объектов")
         return total_added
+
+
+async def upload_to_storage(file_path: str, msg_id: int) -> str:
+    """
+    Загружает файл в Firebase Storage и возвращает публичную ссылку.
+    """
+    bucket = storage.bucket(config.FIREBASE_BUCKET)  # В config добавь FIREBASE_BUCKET = 'botolxkvartir.appspot.com'
+    filename = os.path.basename(file_path)
+    blob = bucket.blob(f"media/{msg_id}/{filename}")
+
+    # Загружаем файл
+    blob.upload_from_filename(file_path)
+
+    # Делаем публичным (если нужно, иначе используй signed URL)
+    blob.make_public()
+
+    logger.info(f"Медиа загружено: {blob.public_url}")
+    return blob.public_url
 
 
 def extract_price(text: str) -> int:
