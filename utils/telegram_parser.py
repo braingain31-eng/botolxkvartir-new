@@ -62,13 +62,13 @@ async def parse_telegram_channels():
         try:
             # Авторизация через Bot Token
             await client.start(bot_token=config.TELEGRAM_BOT_TOKEN)
-            logger.info(f"Telethon успешно авторизован через Bot Token (воркер {worker_id})")
-            logger.info(f"Сессия сохранена/загружена: {session_path}")
+            logger.info(f"Telethon успешно авторизован через Bot Token ")
+            logger.info(f"Сессия сохранена/загружена")
         except SessionPasswordNeededError:
             logger.error("Требуется 2FA-пароль — запусти локально для ввода")
             raise
         except Exception as e:
-            logger.error(f"Критическая ошибка авторизации (воркер {worker_id}): {e}")
+            logger.error(f"Критическая ошибка авторизации: {e}")
             raise
 
         total_added = 0

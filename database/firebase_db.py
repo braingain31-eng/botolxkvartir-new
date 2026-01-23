@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 # Инициализация Firebase
 def init_firebase():
     if not firebase_admin._apps:
+        # FIREBASE_CREDENTIALS_PATH = "/home/user/botolxkvartir/botolxkvartir-firebase-adminsdk-fbsvc-63c5cc654e.json"
+        # cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
+
         cred = credentials.Certificate(config.FIREBASE_CREDENTIALS_PATH)
         firebase_admin.initialize_app(cred)
     return firestore.client()
