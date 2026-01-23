@@ -105,13 +105,31 @@ async def parse_telegram_channels():
                 media_url = None
                 media_type = None
 
-                if msg.photo or msg.video:
-                    file_path = await client.download_media(msg, file=f"{TEMP_MEDIA_DIR}/{msg.id}")
-                    if file_path:
-                        # Загружаем в Storage
-                        media_url = await upload_to_storage(file_path, msg.id)
-                        # Удаляем временный файл
-                        os.remove(file_path)    
+                if msg.photo:
+                    # Скачиваем фото временно
+                    temp_path = f"temp_media/photos/{msg.id}.jpg"
+                    os.makedirs(os.path.dirname(temp_path), exist_ok=True)
+                    await client.download_media(msg.photo, file=temp_path)
+                    
+                    # Загружаем в Storage и получаем URL
+                    media_url = await upload_to_storage(temp_path, f"photos/{msg.id}.jpg")
+                    
+                    # Удаляем временный файл
+                    os.remove(temp_path)
+
+                elif msg.video:
+                    # Видео — скачиваем только если размер небольшой (например < 50 МБ), иначе пропускаем
+                    document = msg.video
+                    if document.size > 50 * 1024 * 1024:  # > 50 МБ — пропускаем
+                        logger.info(f"Видео слишком большое ({document.size} байт) — пропускаем")
+                        continue
+
+                    temp_path = f"temp_media/videos/{msg.id}.mp4"
+                    os.makedirs(os.path.dirname(temp_path), exist_ok=True)
+                    await client.download_media(msg.video, file=temp_path)
+                    
+                    media_url = await upload_to_storage(temp_path, f"videos/{msg.id}.mp4")
+                    os.remove(temp_path)
 
                 if not media_url:
                     continue  # Пропускаем без медиа
