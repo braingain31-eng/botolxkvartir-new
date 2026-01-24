@@ -160,24 +160,27 @@ async def parse_telegram_channels():
 
         logger.info(f"Парсинг завершён. Добавлено {total_added} новых объектов")
         return total_added
+        
 
+async def upload_to_storage(local_path: str, remote_path: str) -> str:
+    try:
+        bucket_name = config.FIREBASE_BUCKET
+        logger.info(f"Загрузка в бакет: {bucket_name}")
 
-async def upload_to_storage(file_path: str, msg_id: int) -> str:
-    """
-    Загружает файл в Firebase Storage и возвращает публичную ссылку.
-    """
-    bucket = storage.bucket(config.FIREBASE_BUCKET)  # В config добавь FIREBASE_BUCKET = 'botolxkvartir.appspot.com'
-    filename = os.path.basename(file_path)
-    blob = bucket.blob(f"media/{msg_id}/{filename}")
+        bucket = storage.bucket(bucket_name)
+        blob = bucket.blob(remote_path)  # remote_path = "media/photos/12345.jpg"
 
-    # Загружаем файл
-    blob.upload_from_filename(file_path)
+        blob.upload_from_filename(local_path)
 
-    # Делаем публичным (если нужно, иначе используй signed URL)
-    blob.make_public()
+        # Делаем файл публичным
+        blob.make_public()
 
-    logger.info(f"Медиа загружено: {blob.public_url}")
-    return blob.public_url
+        public_url = blob.public_url
+        logger.info(f"Файл загружен: {public_url}")
+        return public_url
+    except Exception as e:
+        logger.error(f"Ошибка загрузки {remote_path}: {e}")
+        return None
 
 
 def extract_price(text: str) -> int:
