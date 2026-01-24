@@ -54,4 +54,4 @@ FIREBASE_CREDENTIALS_PATH = os.getenv("FIREBASE_CREDENTIALS_PATH", "/etc/secrets
 # OXYLABS_USERNAME = os.getenv("OXYLABS_USERNAME")
 # OXYLABS_PASSWORD = os.getenv("OXYLABS_PASSWORD")
 
-FIREBASE_BUCKET = 'botolxkvartir.appspot.com'
+FIREBASE_BUCKET = 'botolxkvartir.firebasestorage.app'
